@@ -1,0 +1,54 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "amazon-review-alignment"
+version = "0.1.0"
+description = "Reproducible SFT and DPO pipeline for evidence-grounded Amazon review analysis"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {file = "LICENSE"}
+authors = [{name = "Fangxing Lin"}]
+dependencies = [
+  "datasets>=3.2",
+  "numpy>=1.26",
+  "openai>=2.0",
+  "pandas>=2.2",
+  "pydantic>=2.8",
+  "PyYAML>=6.0",
+]
+
+[project.optional-dependencies]
+train = [
+  "accelerate>=1.2",
+  "bitsandbytes>=0.45; platform_system == 'Linux'",
+  "peft>=0.14",
+  "torch>=2.2",
+  "transformers>=4.51",
+  "trl>=0.16",
+]
+eval = [
+  "matplotlib>=3.8",
+]
+dev = [
+  "pytest>=8.2",
+  "ruff>=0.9",
+]
+
+[project.scripts]
+review-align = "amazon_review_alignment.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

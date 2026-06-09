@@ -1,0 +1,75 @@
+project:
+  seed: 42
+  output_dir: outputs/smoke
+
+data:
+  source_url: https://huggingface.co/datasets/McAuley-Lab/Amazon-Reviews-2023/resolve/main/raw/review_categories/Electronics.jsonl
+  sample_size: 60
+  max_scanned_reviews: 20000
+  rating_targets:
+    "1": 12
+    "2": 12
+    "3": 12
+    "4": 12
+    "5": 12
+  splits:
+    train: 42
+    validation: 6
+    test: 12
+
+teacher:
+  model: gpt-5.4-mini-2026-03-17
+  max_output_tokens: 500
+  max_retries: 2
+  pilot_size: 5
+  max_estimated_cost_usd: 1.0
+  input_price_per_million: 0.75
+  output_price_per_million: 4.50
+  batch_discount: 0.50
+
+model:
+  base_model: Qwen/Qwen3-0.6B
+  max_sequence_length: 512
+  max_new_tokens: 160
+  temperature: 0.0
+  top_p: 1.0
+  load_in_4bit: true
+  lora_r: 8
+  lora_alpha: 16
+  lora_dropout: 0.05
+  lora_target_modules: [q_proj, k_proj, v_proj, o_proj]
+
+training:
+  sft:
+    output_dir: outputs/smoke/models/sft
+    learning_rate: 0.0002
+    epochs: 1
+    per_device_batch_size: 1
+    gradient_accumulation_steps: 1
+    warmup_ratio: 0.0
+    logging_steps: 1
+    eval_steps: 1
+    save_steps: 1
+    max_steps: 1
+  dpo:
+    output_dir: outputs/smoke/models/dpo
+    learning_rate: 0.00005
+    epochs: 1
+    beta: 0.1
+    per_device_batch_size: 1
+    gradient_accumulation_steps: 1
+    warmup_ratio: 0.0
+    logging_steps: 1
+    eval_steps: 1
+    save_steps: 1
+    max_steps: 1
+
+evaluation:
+  max_test_samples: 4
+  bootstrap_samples: 500
+  judge_model: gpt-5.4-mini-2026-03-17
+  judge_samples_per_pair: 4
+  run_llm_judge: false
+  judge_pairs:
+    - [base, sft]
+    - [sft, dpo]

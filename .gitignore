@@ -216,3 +216,12 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Project-generated artifacts
+outputs/*
+!outputs/.gitkeep
+data/
+checkpoints/
+*.safetensors
+adapter_model.bin
+wandb/
