@@ -1,5 +1,7 @@
 from amazon_review_alignment.inference import generation_prompt
 from amazon_review_alignment.train_dpo import build_dpo_records
+from amazon_review_alignment.train_ppo import build_ppo_records
+from amazon_review_alignment.train_reward import build_reward_records
 from amazon_review_alignment.train_sft import build_sft_records
 
 
@@ -15,6 +17,24 @@ class FakeTokenizer:
         assert enable_thinking is False
         rendered = "|".join(f"{item['role']}:{item['content']}" for item in messages)
         return rendered + ("|assistant:" if add_generation_prompt else "")
+
+    def __call__(
+        self,
+        text,
+        padding=False,
+        truncation=False,
+        max_length=None,
+        add_special_tokens=True,
+    ):
+        assert padding is False
+        tokens = list(range(len(text.split())))
+        if truncation:
+            tokens = tokens[:max_length]
+        return {"input_ids": tokens}
+
+    def decode(self, tokens, skip_special_tokens=True):
+        assert skip_special_tokens is True
+        return " ".join(f"token-{token}" for token in tokens)
 
 
 def _preference_rows():
@@ -39,3 +59,13 @@ def test_sft_and_dpo_formatters_disable_thinking() -> None:
     assert dpo[0]["prompt"].endswith("|assistant:")
     assert dpo[0]["chosen"] == _preference_rows()[0]["chosen"]
     assert prompt.endswith("|assistant:")
+
+
+def test_reward_and_ppo_formatters_use_same_chat_prompt() -> None:
+    tokenizer = FakeTokenizer()
+    reward = build_reward_records(_preference_rows(), tokenizer)
+    ppo = build_ppo_records(_preference_rows(), tokenizer, max_prompt_length=4)
+
+    assert reward[0]["chosen"].endswith(_preference_rows()[0]["chosen"])
+    assert reward[0]["rejected"].endswith(_preference_rows()[0]["rejected"])
+    assert len(ppo[0]["input_ids"]) <= 4

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
@@ -57,9 +58,25 @@ def generate_one(
 def adapter_for_variant(config: dict[str, Any], variant: str) -> Path | None:
     if variant == "base":
         return None
-    if variant not in {"sft", "dpo"}:
+    if variant in {"sft", "dpo"}:
+        return Path(config["training"][variant]["output_dir"]).resolve()
+    if variant == "ppo":
+        return Path(config["rlhf"]["ppo"]["output_dir"]).resolve()
+    raise ValueError(f"Unknown model variant: {variant}")
+
+
+def model_config_for_variant(
+    config: dict[str, Any],
+    variant: str,
+) -> dict[str, Any]:
+    model_config = deepcopy(config["model"])
+    if variant == "ppo":
+        model_config["base_model"] = str(
+            Path(config["rlhf"]["sft_merged_dir"]).resolve()
+        )
+    elif variant not in {"base", "sft", "dpo"}:
         raise ValueError(f"Unknown model variant: {variant}")
-    return Path(config["training"][variant]["output_dir"]).resolve()
+    return model_config
 
 
 def run_inference(
@@ -78,11 +95,19 @@ def run_inference(
     test_rows = read_jsonl(output_root(config) / "data" / "test.jsonl")
     limit = int(config["evaluation"]["max_test_samples"])
     test_rows = test_rows[:limit]
-    tokenizer = load_tokenizer(config["model"]["base_model"], padding_side="left")
+    variant_model_config = model_config_for_variant(config, variant)
+    tokenizer = load_tokenizer(
+        variant_model_config["base_model"],
+        padding_side="left",
+    )
     adapter_path = adapter_for_variant(config, variant)
     if adapter_path and not adapter_path.exists():
         raise RuntimeError(f"{variant.upper()} adapter does not exist: {adapter_path}")
-    model = load_policy_model(config["model"], adapter_path, for_training=False)
+    model = load_policy_model(
+        variant_model_config,
+        adapter_path,
+        for_training=False,
+    )
 
     predictions = []
     for index, row in enumerate(test_rows, start=1):

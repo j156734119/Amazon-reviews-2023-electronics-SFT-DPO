@@ -18,7 +18,7 @@ def _add_common_arguments(parser: argparse.ArgumentParser) -> None:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="review-align",
-        description="Amazon review SFT and DPO research pipeline.",
+        description="Amazon review SFT, DPO, Reward Model, and PPO pipeline.",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -43,9 +43,30 @@ def build_parser() -> argparse.ArgumentParser:
     dpo = subparsers.add_parser("train-dpo")
     _add_common_arguments(dpo)
 
+    rm_human = subparsers.add_parser("prepare-rm-human-eval")
+    _add_common_arguments(rm_human)
+    rm_human.add_argument("--samples", type=int)
+
+    rlhf_data = subparsers.add_parser("build-rlhf-data")
+    _add_common_arguments(rlhf_data)
+    rlhf_data.add_argument("--responses", type=Path, required=True)
+
+    merge = subparsers.add_parser("merge-sft")
+    _add_common_arguments(merge)
+
+    reward = subparsers.add_parser("train-reward")
+    _add_common_arguments(reward)
+
+    ppo = subparsers.add_parser("train-ppo")
+    _add_common_arguments(ppo)
+
     inference = subparsers.add_parser("inference")
     _add_common_arguments(inference)
-    inference.add_argument("--variant", choices=("base", "sft", "dpo"), required=True)
+    inference.add_argument(
+        "--variant",
+        choices=("base", "sft", "dpo", "ppo"),
+        required=True,
+    )
     inference.add_argument("--force", action="store_true")
 
     evaluate = subparsers.add_parser("evaluate")
@@ -102,6 +123,32 @@ def main(argv: list[str] | None = None) -> None:
         from .train_dpo import train_dpo
 
         command_handlers[args.command] = lambda: train_dpo(config)
+    elif args.command == "prepare-rm-human-eval":
+        from .rlhf_data import prepare_rm_human_eval
+
+        command_handlers[args.command] = lambda: prepare_rm_human_eval(
+            config,
+            args.samples,
+        )
+    elif args.command == "build-rlhf-data":
+        from .rlhf_data import build_rlhf_data
+
+        command_handlers[args.command] = lambda: build_rlhf_data(
+            config,
+            args.responses,
+        )
+    elif args.command == "merge-sft":
+        from .merge_sft import merge_sft
+
+        command_handlers[args.command] = lambda: merge_sft(config)
+    elif args.command == "train-reward":
+        from .train_reward import train_reward
+
+        command_handlers[args.command] = lambda: train_reward(config)
+    elif args.command == "train-ppo":
+        from .train_ppo import train_ppo
+
+        command_handlers[args.command] = lambda: train_ppo(config)
     elif args.command == "inference":
         from .inference import run_inference
 

@@ -193,9 +193,10 @@ def summarize_pairwise(
 def run_evaluation(config: dict[str, Any], force_inference: bool = False) -> dict[str, Any]:
     evaluation_dir = output_root(config) / "evaluation"
     evaluation_dir.mkdir(parents=True, exist_ok=True)
+    variants = list(config["evaluation"].get("variants", ["base", "sft", "dpo"]))
     prediction_paths = {
         variant: run_inference(config, variant, force=force_inference)
-        for variant in ("base", "sft", "dpo")
+        for variant in variants
     }
     metrics = []
     predictions: dict[str, list[dict[str, Any]]] = {}

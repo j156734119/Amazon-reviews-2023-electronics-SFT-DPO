@@ -72,6 +72,7 @@ training:
     max_steps: -1
 
 evaluation:
+  variants: [base, sft, dpo]
   max_test_samples: 1000
   bootstrap_samples: 10000
   judge_model: gpt-5.4-mini-2026-03-17

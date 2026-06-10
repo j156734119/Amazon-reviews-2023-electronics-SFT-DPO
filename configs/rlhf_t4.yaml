@@ -1,0 +1,56 @@
+extends: full.yaml
+
+rlhf:
+  human_calibration_samples: 200
+  human_train_fraction: 0.8
+  ai_reward_train_pairs: 800
+  ai_reward_validation_pairs: 500
+  ppo_prompt_count: 256
+  sft_merged_dir: outputs/models/sft-merged
+  reward:
+    output_dir: outputs/models/reward
+    max_sequence_length: 512
+    learning_rate: 0.0001
+    epochs: 2
+    per_device_batch_size: 2
+    gradient_accumulation_steps: 8
+    warmup_ratio: 0.05
+    logging_steps: 10
+    eval_steps: 50
+    save_steps: 50
+    lora_r: 8
+    lora_alpha: 16
+    lora_dropout: 0.05
+    lora_target_modules: [q_proj, k_proj, v_proj, o_proj]
+  ppo:
+    output_dir: outputs/models/ppo
+    total_episodes: 256
+    max_prompt_length: 384
+    response_length: 128
+    per_device_train_batch_size: 1
+    per_device_eval_batch_size: 1
+    gradient_accumulation_steps: 8
+    local_rollout_forward_batch_size: 1
+    num_mini_batches: 1
+    num_ppo_epochs: 1
+    learning_rate: 0.000003
+    temperature: 0.7
+    kl_coef: 0.05
+    cliprange: 0.2
+    missing_eos_penalty: 1.0
+    logging_steps: 1
+    save_steps: 8
+    fp16: true
+    max_peak_memory_gb: 15.5
+    lora_r: 8
+    lora_alpha: 16
+    lora_dropout: 0.05
+    lora_target_modules: [q_proj, v_proj]
+
+evaluation:
+  variants: [base, sft, dpo, ppo]
+  judge_pairs:
+    - [base, sft]
+    - [sft, dpo]
+    - [sft, ppo]
+    - [dpo, ppo]
