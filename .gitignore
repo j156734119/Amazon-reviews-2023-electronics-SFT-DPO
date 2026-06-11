@@ -222,6 +222,7 @@ outputs/*
 !outputs/.gitkeep
 data/
 checkpoints/
+legacy/
 *.safetensors
 adapter_model.bin
 wandb/
