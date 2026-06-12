@@ -11,6 +11,8 @@ from .modeling import (
     lora_config,
     render_chat,
     supported_kwargs,
+    training_precision,
+    upcast_trainable_parameters,
 )
 from .prompts import SYSTEM_PROMPT, analysis_user_prompt
 from .utils import read_jsonl, save_run_metadata, set_seed
@@ -21,18 +23,18 @@ LOGGER = logging.getLogger(__name__)
 def build_sft_records(rows: list[dict[str, Any]], tokenizer: Any) -> list[dict[str, str]]:
     records = []
     for row in rows:
-        messages = [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": analysis_user_prompt(row["text"])},
-            {"role": "assistant", "content": row["chosen"]},
-        ]
+        prompt = render_chat(
+            tokenizer,
+            [
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": analysis_user_prompt(row["text"])},
+            ],
+            add_generation_prompt=True,
+        )
         records.append(
             {
-                "text": render_chat(
-                    tokenizer,
-                    messages,
-                    add_generation_prompt=False,
-                )
+                "prompt": prompt,
+                "completion": row["chosen"],
             }
         )
     return records
@@ -71,10 +73,11 @@ def train_sft(config: dict[str, Any]) -> Path:
         "eval_steps": int(training_config["eval_steps"]),
         "save_steps": int(training_config["save_steps"]),
         "max_steps": int(training_config["max_steps"]),
-        "dataset_text_field": "text",
+        "completion_only_loss": True,
         "max_length": int(model_config["max_sequence_length"]),
         "max_seq_length": int(model_config["max_sequence_length"]),
         "gradient_checkpointing": True,
+        **training_precision(training_config),
         "report_to": "none",
         "eval_strategy": "steps",
         "evaluation_strategy": "steps",
@@ -93,6 +96,9 @@ def train_sft(config: dict[str, Any]) -> Path:
         "peft_config": lora_config(model_config),
     }
     trainer = SFTTrainer(**supported_kwargs(SFTTrainer, trainer_values))
+    if bool(training_config.get("fp16")):
+        precision = upcast_trainable_parameters(trainer.model)
+        LOGGER.info("Upcast SFT trainable parameters to FP32: %s", precision)
     trainer.train()
     trainer.save_model(str(output_dir))
     tokenizer.save_pretrained(str(output_dir))

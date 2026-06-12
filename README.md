@@ -1,12 +1,12 @@
-# Amazon Review Alignment: SFT, DPO, and PPO
+# Amazon Review Alignment: SFT, DPO, PPO, and GRPO
 
 An engineering-oriented research pipeline for testing whether supervised
-fine-tuning (SFT), Direct Preference Optimization (DPO), and a constrained
-Reward Model plus PPO pipeline improve small language models at producing
+fine-tuning (SFT), Direct Preference Optimization (DPO), and constrained
+PPO/GRPO pipelines improve small language models at producing
 structured, faithful, evidence-grounded analysis of Amazon Electronics reviews.
 
-The original DistilBERT classification notebook and course report are retained
-under `legacy/` as project history. The current task is generative:
+The original DistilBERT classification notebook and course report can be kept
+locally under the Git-ignored `legacy/` directory. The current task is generative:
 
 ```json
 {
@@ -18,13 +18,14 @@ under `legacy/` as project history. The current task is generative:
 
 ## Research comparison
 
-The pipeline evaluates four policies using the same prompts, decoding settings,
+The pipeline evaluates five policies using the same prompts, decoding settings,
 and held-out test reviews:
 
-1. Base: `Qwen/Qwen3-0.6B`
+1. Base: `Qwen/Qwen3-0.6B` for smoke, `Qwen/Qwen3.5-2B` for A100 training
 2. SFT: 4-bit QLoRA on teacher-generated structured analyses
 3. SFT + DPO: preference optimization from the SFT policy
-4. SFT + Reward Model + PPO: human-calibrated RLAIF on a T4-scale budget
+4. SFT + Reward Model + PPO: human-calibrated RLAIF on a bounded GPU budget
+5. SFT + Reward Model + rule rewards + GRPO: grouped online RLAIF
 
 Primary outcomes are schema validity, exact evidence grounding, instruction
 following, and blinded pairwise preference. Rating agreement is retained only
@@ -52,8 +53,13 @@ nvidia-smi
 
 `bitsandbytes` support depends on the CUDA, PyTorch, and operating-system
 combination. Cloud Linux with a CUDA GPU is required for the full training
-pipeline. `configs/rlhf_t4.yaml` targets a single T4 16GB GPU. Smoke
-configurations validate wiring and tiny runs rather than research conclusions.
+pipeline. Use `configs/rlhf_smoke.yaml` for Qwen3-0.6B wiring validation,
+`configs/rlhf_a100.yaml` for the BF16 Qwen3.5-2B experiment, and
+`configs/rlhf_t4.yaml` only as the retained 0.6B T4 compatibility profile.
+
+The A100 profile uses 128 shared PPO/GRPO prompts and 500 evaluation examples
+to reduce Colab Compute Unit consumption. Colab charges Compute Units
+dynamically, so an exact 100-CU total cannot be guaranteed.
 
 ## Pipeline
 
@@ -65,6 +71,7 @@ review-align teacher-pilot --config configs/full.yaml --limit 100
 review-align teacher-batch --config configs/full.yaml
 
 review-align train-sft --config configs/full.yaml
+review-align merge-sft --config configs/full.yaml
 review-align train-dpo --config configs/full.yaml
 review-align evaluate --config configs/full.yaml
 
@@ -76,74 +83,96 @@ Start with `configs/smoke.yaml` to exercise each stage on a small sample.
 Generated datasets, API records, adapters, predictions, metrics, plots, and
 reports are written below `outputs/`.
 
-## T4 Reward Model and PPO extension
+## A100 Reward Model, PPO, and GRPO extension
 
-The PPO branch requires the SFT adapter and validated teacher preferences.
+The online RL branches require the SFT adapter and validated teacher preferences.
 Prepare a blinded human calibration sheet:
 
 ```powershell
 review-align prepare-rm-human-eval `
-  --config configs/rlhf_t4.yaml `
+  --config configs/rlhf_a100.yaml `
   --samples 200
 ```
 
 Fill the `choice` column in
-`outputs/rlhf/rm_human_responses.csv` with `A`, `B`, or `tie`. Do not inspect
+`outputs/a100-qwen3.5-2b/rlhf/rm_human_responses.csv` with `A`, `B`, or `tie`. Do not inspect
 `rm_human_key.jsonl` before finishing the blind annotation. Build disjoint
 Reward Model and PPO datasets:
 
 ```powershell
 review-align build-rlhf-data `
-  --config configs/rlhf_t4.yaml `
-  --responses outputs/rlhf/rm_human_responses.csv
+  --config configs/rlhf_a100.yaml `
+  --responses outputs/a100-qwen3.5-2b/rlhf/rm_human_responses.csv
 ```
 
-Train on the T4:
+Train on the A100:
 
 ```bash
-review-align merge-sft --config configs/rlhf_t4.yaml
-review-align train-reward --config configs/rlhf_t4.yaml
-review-align train-ppo --config configs/rlhf_t4.yaml
+review-align train-sft --config configs/rlhf_a100.yaml
+review-align merge-sft --config configs/rlhf_a100.yaml
+review-align train-dpo --config configs/rlhf_a100.yaml
+review-align train-reward --config configs/rlhf_a100.yaml
+review-align train-ppo --config configs/rlhf_a100.yaml
+review-align train-grpo --config configs/rlhf_a100.yaml
 ```
 
-The default T4 experiment uses:
+The A100 experiment uses:
 
 - 200 blinded human calibration pairs;
 - 800 additional AI preference pairs for Reward Model training;
 - 500 AI validation pairs plus a held-out human split;
-- 256 PPO episodes with 128 generated tokens;
+- 128 PPO episodes with 128 generated tokens;
+- 128 shared GRPO prompts with four completions per prompt;
 - a 4-bit policy, Reward Model, and Value Model;
-- a PPO LoRA adapter on `q_proj` and `v_proj`.
+- PPO/GRPO LoRA adapters on Qwen3.5 attention projections.
 
 The PPO reference is the merged SFT policy with the trainable PPO adapter
 disabled. PPO outputs are saved as a small adapter under
-`outputs/models/ppo/`.
+`outputs/a100-qwen3.5-2b/models/ppo/`.
 
-For an end-to-end connectivity test, replace `rlhf_t4.yaml` with
+For an end-to-end connectivity test, replace `rlhf_a100.yaml` with
 `rlhf_smoke.yaml`. It uses 8 human pairs, 8 AI RM pairs, and 8 PPO episodes.
 
-## Four-model evaluation
+## Five-model evaluation
 
 ```bash
-review-align evaluate --config configs/rlhf_t4.yaml
-review-align evaluate --config configs/rlhf_t4.yaml --llm-judge
+review-align evaluate --config configs/rlhf_a100.yaml
+review-align evaluate --config configs/rlhf_a100.yaml --llm-judge
 ```
 
-The RLHF configuration evaluates `base`, `sft`, `dpo`, and `ppo`. It adds
-`SFT vs PPO` and `DPO vs PPO` pairwise comparisons. A separate 200-example
+The RLHF configuration evaluates `base`, `sft`, `dpo`, `ppo`, and `grpo`.
+GRPO uses the same prompts as PPO and four completions per prompt in the A100
+profile. Its reward combines the frozen Reward Model with schema, grounded
+evidence, and length checks. A separate 200-example
 human comparison can be prepared with:
 
 ```bash
 review-align human-eval \
-  --config configs/rlhf_t4.yaml \
+  --config configs/rlhf_a100.yaml \
   --samples 200 \
-  --left-variant dpo \
-  --right-variant ppo
+  --left-variant ppo \
+  --right-variant grpo
 ```
 
-Reward Model metrics are written to `outputs/rlhf/reward_metrics.json`. PPO
-reward, KL, policy loss, value loss, runtime, and peak allocated CUDA memory
-are written to `outputs/rlhf/ppo_metrics.json`.
+Reward Model, PPO, and GRPO metrics are written below
+`outputs/a100-qwen3.5-2b/rlhf/`, including reward components, KL, entropy,
+clipping, completion lengths, runtime, and memory.
+
+## Independent Colab notebook
+
+The repository contains a Python generator rather than a tracked `.ipynb`, so
+GitHub language statistics remain Python-focused. Generate the standalone
+notebook outside this repository with:
+
+```powershell
+python tools/build_colab_notebook.py `
+  C:\Users\13105\Desktop\Amazon-review-alignment-colab\Amazon_Review_Alignment_Colab.ipynb
+```
+
+The notebook contains its own data, model, training, evaluation, Drive
+persistence, and checkpoint-resume code. It does not import this package. Keep
+`PROFILE="smoke"` for Qwen3-0.6B, then switch to `PROFILE="a100"` for
+Qwen3.5-2B after the complete smoke run succeeds.
 
 ## Teacher generation and cost control
 

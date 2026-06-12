@@ -1,5 +1,6 @@
 from amazon_review_alignment.inference import generation_prompt
 from amazon_review_alignment.train_dpo import build_dpo_records
+from amazon_review_alignment.train_grpo import build_grpo_records
 from amazon_review_alignment.train_ppo import build_ppo_records
 from amazon_review_alignment.train_reward import build_reward_records
 from amazon_review_alignment.train_sft import build_sft_records
@@ -40,6 +41,7 @@ class FakeTokenizer:
 def _preference_rows():
     return [
         {
+            "id": "review-1",
             "text": "Works well.",
             "chosen": '{"sentiment":"positive","evidence":["Works well"],'
             '"analysis":"The review is positive."}',
@@ -55,7 +57,8 @@ def test_sft_and_dpo_formatters_disable_thinking() -> None:
     dpo = build_dpo_records(_preference_rows(), tokenizer)
     prompt = generation_prompt(tokenizer, "Works well.")
 
-    assert sft[0]["text"].endswith(_preference_rows()[0]["chosen"])
+    assert sft[0]["prompt"].endswith("|assistant:")
+    assert sft[0]["completion"] == _preference_rows()[0]["chosen"]
     assert dpo[0]["prompt"].endswith("|assistant:")
     assert dpo[0]["chosen"] == _preference_rows()[0]["chosen"]
     assert prompt.endswith("|assistant:")
@@ -69,3 +72,6 @@ def test_reward_and_ppo_formatters_use_same_chat_prompt() -> None:
     assert reward[0]["chosen"].endswith(_preference_rows()[0]["chosen"])
     assert reward[0]["rejected"].endswith(_preference_rows()[0]["rejected"])
     assert len(ppo[0]["input_ids"]) <= 4
+    grpo = build_grpo_records(_preference_rows(), tokenizer)
+    assert grpo[0]["prompt"].endswith("|assistant:")
+    assert grpo[0]["text"] == "Works well."

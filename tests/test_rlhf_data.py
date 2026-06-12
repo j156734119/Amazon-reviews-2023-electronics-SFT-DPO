@@ -63,6 +63,7 @@ def test_human_calibration_builds_disjoint_rlhf_data(tmp_path: Path) -> None:
     rm_train = read_jsonl(tmp_path / "rlhf" / "rm_train.jsonl")
     human_eval = read_jsonl(tmp_path / "rlhf" / "rm_human_eval.jsonl")
     ppo = read_jsonl(tmp_path / "rlhf" / "ppo_prompts.jsonl")
+    grpo = read_jsonl(tmp_path / "rlhf" / "grpo_prompts.jsonl")
     ids = [
         {row["id"] for row in rm_train},
         {row["id"] for row in human_eval},
@@ -71,6 +72,8 @@ def test_human_calibration_builds_disjoint_rlhf_data(tmp_path: Path) -> None:
     assert not ids[0] & ids[1]
     assert not ids[0] & ids[2]
     assert not ids[1] & ids[2]
+    assert [row["id"] for row in ppo] == [row["id"] for row in grpo]
+    assert manifest["ppo_grpo_shared_prompt_ids"] is True
 
 
 def test_human_choice_controls_preference_direction(tmp_path: Path) -> None:

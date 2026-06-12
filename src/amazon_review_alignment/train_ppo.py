@@ -12,6 +12,9 @@ from .modeling import (
     quantization_kwargs,
     render_chat,
     supported_kwargs,
+    training_precision,
+    upcast_trainable_parameters,
+    validate_model_runtime,
 )
 from .prompts import SYSTEM_PROMPT, analysis_user_prompt
 from .utils import read_jsonl, save_run_metadata, set_seed, write_json
@@ -55,6 +58,7 @@ def _load_reward_adapter(
     from peft import PeftModel, prepare_model_for_kbit_training
     from transformers import AutoModelForSequenceClassification
 
+    validate_model_runtime(model_config)
     model = AutoModelForSequenceClassification.from_pretrained(
         str(merged_path),
         num_labels=1,
@@ -189,8 +193,7 @@ def train_ppo(config: dict[str, Any]) -> Path:
         "missing_eos_penalty": float(ppo_config["missing_eos_penalty"]),
         "logging_steps": int(ppo_config["logging_steps"]),
         "save_steps": int(ppo_config["save_steps"]),
-        "fp16": bool(ppo_config["fp16"]),
-        "bf16": False,
+        **training_precision(ppo_config),
         "gradient_checkpointing": True,
         "stop_token": "eos",
         "report_to": "none",
@@ -204,7 +207,7 @@ def train_ppo(config: dict[str, Any]) -> Path:
         r=int(ppo_config["lora_r"]),
         lora_alpha=int(ppo_config["lora_alpha"]),
         lora_dropout=float(ppo_config["lora_dropout"]),
-        target_modules=list(ppo_config["lora_target_modules"]),
+        target_modules=ppo_config["lora_target_modules"],
         bias="none",
     )
     trainer_values = {
@@ -219,6 +222,9 @@ def train_ppo(config: dict[str, Any]) -> Path:
         "peft_config": peft_config,
     }
     trainer = PPOTrainer(**supported_kwargs(PPOTrainer, trainer_values))
+    if bool(ppo_config.get("fp16")):
+        precision = upcast_trainable_parameters(trainer.model)
+        LOGGER.info("Upcast PPO trainable parameters to FP32: %s", precision)
     torch.cuda.reset_peak_memory_stats()
     start = time.perf_counter()
     trainer.train()

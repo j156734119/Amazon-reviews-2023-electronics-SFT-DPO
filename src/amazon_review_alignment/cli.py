@@ -18,7 +18,7 @@ def _add_common_arguments(parser: argparse.ArgumentParser) -> None:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="review-align",
-        description="Amazon review SFT, DPO, Reward Model, and PPO pipeline.",
+        description="Amazon review SFT, DPO, PPO, and GRPO alignment pipeline.",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -60,11 +60,14 @@ def build_parser() -> argparse.ArgumentParser:
     ppo = subparsers.add_parser("train-ppo")
     _add_common_arguments(ppo)
 
+    grpo = subparsers.add_parser("train-grpo")
+    _add_common_arguments(grpo)
+
     inference = subparsers.add_parser("inference")
     _add_common_arguments(inference)
     inference.add_argument(
         "--variant",
-        choices=("base", "sft", "dpo", "ppo"),
+        choices=("base", "sft", "dpo", "ppo", "grpo"),
         required=True,
     )
     inference.add_argument("--force", action="store_true")
@@ -81,8 +84,8 @@ def build_parser() -> argparse.ArgumentParser:
     human = subparsers.add_parser("human-eval")
     _add_common_arguments(human)
     human.add_argument("--samples", type=int, default=200)
-    human.add_argument("--left-variant", default="sft")
-    human.add_argument("--right-variant", default="dpo")
+    human.add_argument("--left-variant", default="ppo")
+    human.add_argument("--right-variant", default="grpo")
     human.add_argument("--responses", type=Path)
 
     report = subparsers.add_parser("build-report")
@@ -149,6 +152,10 @@ def main(argv: list[str] | None = None) -> None:
         from .train_ppo import train_ppo
 
         command_handlers[args.command] = lambda: train_ppo(config)
+    elif args.command == "train-grpo":
+        from .train_grpo import train_grpo
+
+        command_handlers[args.command] = lambda: train_grpo(config)
     elif args.command == "inference":
         from .inference import run_inference
 

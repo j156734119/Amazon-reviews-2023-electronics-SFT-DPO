@@ -1,6 +1,6 @@
 project:
   seed: 42
-  output_dir: outputs
+  output_dir: outputs/a100-qwen3.5-2b
 
 data:
   source_url: https://huggingface.co/datasets/McAuley-Lab/Amazon-Reviews-2023/resolve/main/raw/review_categories/Electronics.jsonl
@@ -28,9 +28,11 @@ teacher:
   batch_discount: 0.50
 
 model:
-  base_model: Qwen/Qwen3-0.6B
-  max_sequence_length: 1024
-  max_new_tokens: 220
+  base_model: Qwen/Qwen3.5-2B
+  min_transformers_version: 5.5.4
+  sft_merged_dir: outputs/a100-qwen3.5-2b/models/sft-merged
+  max_sequence_length: 768
+  max_new_tokens: 160
   temperature: 0.0
   top_p: 1.0
   load_in_4bit: true
@@ -38,6 +40,9 @@ model:
   lora_alpha: 32
   lora_dropout: 0.05
   lora_target_modules:
+    - in_proj_qkv
+    - in_proj_z
+    - out_proj
     - q_proj
     - k_proj
     - v_proj
@@ -48,9 +53,23 @@ model:
 
 training:
   sft:
-    output_dir: outputs/models/sft
+    output_dir: outputs/a100-qwen3.5-2b/models/sft
     learning_rate: 0.0002
-    epochs: 3
+    epochs: 1
+    per_device_batch_size: 4
+    gradient_accumulation_steps: 4
+    warmup_ratio: 0.05
+    logging_steps: 10
+    eval_steps: 100
+    save_steps: 100
+    max_steps: -1
+    fp16: false
+    bf16: true
+  dpo:
+    output_dir: outputs/a100-qwen3.5-2b/models/dpo
+    learning_rate: 0.00005
+    epochs: 1
+    beta: 0.1
     per_device_batch_size: 2
     gradient_accumulation_steps: 8
     warmup_ratio: 0.05
@@ -58,22 +77,12 @@ training:
     eval_steps: 100
     save_steps: 100
     max_steps: -1
-  dpo:
-    output_dir: outputs/models/dpo
-    learning_rate: 0.00005
-    epochs: 1
-    beta: 0.1
-    per_device_batch_size: 1
-    gradient_accumulation_steps: 16
-    warmup_ratio: 0.05
-    logging_steps: 10
-    eval_steps: 100
-    save_steps: 100
-    max_steps: -1
+    fp16: false
+    bf16: true
 
 evaluation:
   variants: [base, sft, dpo]
-  max_test_samples: 1000
+  max_test_samples: 500
   bootstrap_samples: 10000
   judge_model: gpt-5.4-mini-2026-03-17
   judge_samples_per_pair: 200

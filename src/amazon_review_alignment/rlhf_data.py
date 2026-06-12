@@ -196,6 +196,14 @@ def build_rlhf_data(
     rng.shuffle(ai_candidates)
     ai_count = int(config["rlhf"]["ai_reward_train_pairs"])
     ppo_count = int(config["rlhf"]["ppo_prompt_count"])
+    grpo_count = int(
+        config["rlhf"].get("grpo", {}).get("prompt_count", ppo_count)
+    )
+    if grpo_count != ppo_count:
+        raise ValueError(
+            "PPO and GRPO prompt counts must match for the controlled comparison: "
+            f"{ppo_count} != {grpo_count}."
+        )
     if len(ai_candidates) < ai_count + ppo_count:
         raise ValueError(
             "Not enough unused training preferences for Reward Model and PPO data: "
@@ -245,6 +253,7 @@ def build_rlhf_data(
     write_jsonl(directory / "rm_human_eval.jsonl", human_eval)
     write_jsonl(directory / "rm_ai_validation.jsonl", rm_ai_validation)
     write_jsonl(directory / "ppo_prompts.jsonl", ppo_prompts)
+    write_jsonl(directory / "grpo_prompts.jsonl", ppo_prompts)
     manifest = {
         "human_total_rows": len(human_pairs) + ties,
         "human_non_tie_rows": len(human_pairs),
@@ -255,6 +264,8 @@ def build_rlhf_data(
         "ai_reward_validation_pairs": len(ai_validation_raw),
         "reward_train_pairs_total": len(rm_train),
         "ppo_prompts": len(ppo_prompts),
+        "grpo_prompts": len(ppo_prompts),
+        "ppo_grpo_shared_prompt_ids": True,
         "test_rows_excluded": len(test_rows),
         "seed": seed,
     }

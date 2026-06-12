@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+from importlib.metadata import version
 from pathlib import Path
 from typing import Any
 
@@ -24,7 +25,7 @@ def quantization_kwargs(model_config: dict[str, Any]) -> dict[str, Any]:
     import torch
 
     if not bool(model_config.get("load_in_4bit")) or not torch.cuda.is_available():
-        return {"torch_dtype": torch.float32 if not torch.cuda.is_available() else "auto"}
+        return {"dtype": torch.float32 if not torch.cuda.is_available() else "auto"}
     from transformers import BitsAndBytesConfig
 
     compute_dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
@@ -39,9 +40,33 @@ def quantization_kwargs(model_config: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def training_precision(training_config: dict[str, Any]) -> dict[str, bool]:
+    fp16 = bool(training_config.get("fp16", False))
+    bf16 = bool(training_config.get("bf16", False))
+    if fp16 and bf16:
+        raise ValueError("fp16 and bf16 cannot both be enabled.")
+    return {"fp16": fp16, "bf16": bf16}
+
+
+def validate_model_runtime(model_config: dict[str, Any]) -> None:
+    minimum = model_config.get("min_transformers_version")
+    if not minimum:
+        return
+
+    from packaging.version import Version
+
+    installed = version("transformers")
+    if Version(installed) < Version(str(minimum)):
+        raise RuntimeError(
+            f"{model_config['base_model']} requires transformers>={minimum}; "
+            f"found {installed}. Reinstall the training dependencies."
+        )
+
+
 def load_base_model(model_config: dict[str, Any], for_training: bool) -> Any:
     from transformers import AutoModelForCausalLM
 
+    validate_model_runtime(model_config)
     model = AutoModelForCausalLM.from_pretrained(
         model_config["base_model"],
         trust_remote_code=True,
@@ -81,14 +106,45 @@ def load_policy_model(
 def lora_config(model_config: dict[str, Any]) -> Any:
     from peft import LoraConfig, TaskType
 
+    target_modules = model_config["lora_target_modules"]
+    if not isinstance(target_modules, str):
+        target_modules = list(target_modules)
     return LoraConfig(
         task_type=TaskType.CAUSAL_LM,
         r=int(model_config["lora_r"]),
         lora_alpha=int(model_config["lora_alpha"]),
         lora_dropout=float(model_config["lora_dropout"]),
-        target_modules=list(model_config["lora_target_modules"]),
+        target_modules=target_modules,
         bias="none",
     )
+
+
+def sft_merged_path(config: dict[str, Any]) -> Path:
+    configured = config.get("rlhf", {}).get(
+        "sft_merged_dir",
+        config["model"].get("sft_merged_dir"),
+    )
+    if not configured:
+        raise ValueError("A merged SFT output path is required in the configuration.")
+    return Path(configured).resolve()
+
+
+def upcast_trainable_parameters(model: Any) -> dict[str, int]:
+    import torch
+
+    tensors = 0
+    parameters = 0
+    for parameter in model.parameters():
+        if not parameter.requires_grad:
+            continue
+        tensors += 1
+        parameters += parameter.numel()
+        if parameter.dtype != torch.float32:
+            parameter.data = parameter.data.to(torch.float32)
+    return {
+        "trainable_tensors": tensors,
+        "trainable_parameters": parameters,
+    }
 
 
 def render_chat(

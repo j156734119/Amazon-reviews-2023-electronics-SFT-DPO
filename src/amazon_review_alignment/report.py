@@ -67,15 +67,15 @@ def build_report(config: dict[str, Any]) -> Path:
     human = _read_json_if_exists(evaluation_dir / "human_eval_summary.json")
     reward = _read_json_if_exists(root / "rlhf" / "reward_metrics.json")
     ppo = _read_json_if_exists(root / "rlhf" / "ppo_metrics.json")
+    grpo = _read_json_if_exists(root / "rlhf" / "grpo_metrics.json")
 
     lines = [
         "# Amazon Review Alignment Results",
         "",
         "## Research question",
         "",
-        "How do SFT, DPO, and a resource-constrained PPO-based human-calibrated "
-        "RLAIF baseline affect a small model's structured, evidence-grounded "
-        "Amazon review analyses?",
+        "How do SFT, DPO, PPO, and GRPO affect a small model's structured, "
+        "evidence-grounded Amazon review analyses under a constrained compute budget?",
         "",
         "The comparison uses identical prompts, decoding settings, and held-out reviews. "
         "The previous DistilBERT classification result is historical context and is not "
@@ -173,6 +173,27 @@ def build_report(config: dict[str, Any]) -> Path:
         )
         for name, value in ppo.get("final_logged_metrics", {}).items():
             lines.append(f"- `{name}`: {float(value):.6f}")
+    if grpo is not None:
+        lines.extend(
+            [
+                "",
+                "## GRPO feasibility metrics",
+                "",
+                f"- Unique prompts: {grpo['unique_prompts']}",
+                f"- Generations per prompt: {grpo['num_generations']}",
+                "- Expected completions per epoch: "
+                f"{grpo['expected_completions_per_epoch']}",
+                f"- Runtime: {float(grpo['runtime_seconds']) / 60:.1f} minutes",
+                "- Peak allocated CUDA memory: "
+                f"{float(grpo['peak_cuda_memory_allocated_gb']):.2f} GiB",
+                "- Peak reserved CUDA memory: "
+                f"{float(grpo['peak_cuda_memory_reserved_gb']):.2f} GiB",
+                "- Reference policy: merged SFT policy with the GRPO adapter disabled.",
+                f"- Reward weights: `{json.dumps(grpo['reward_weights'])}`",
+            ]
+        )
+        for name, value in grpo.get("final_logged_metrics", {}).items():
+            lines.append(f"- `{name}`: {float(value):.6f}")
 
     lines.extend(
         [
@@ -197,6 +218,10 @@ def build_report(config: dict[str, Any]) -> Path:
             (
                 "- The PPO policy receives only 256 episodes in the T4 configuration; "
                 "it is a resource-constrained baseline, not a convergence claim."
+            ),
+            (
+                "- GRPO uses 256 prompts with four sampled completions each; "
+                "it is a resource-constrained RLAIF baseline, not a convergence claim."
             ),
             "- Full conclusions require the configured cloud training runs and blinded evaluation.",
             "",

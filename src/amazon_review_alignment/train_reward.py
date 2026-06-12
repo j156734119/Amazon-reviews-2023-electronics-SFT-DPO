@@ -12,6 +12,9 @@ from .modeling import (
     quantization_kwargs,
     render_chat,
     supported_kwargs,
+    training_precision,
+    upcast_trainable_parameters,
+    validate_model_runtime,
 )
 from .prompts import SYSTEM_PROMPT, analysis_user_prompt
 from .utils import read_jsonl, save_run_metadata, set_seed, write_json
@@ -146,6 +149,7 @@ def train_reward(config: dict[str, Any]) -> Path:
         raise RuntimeError("RLHF data is missing. Run build-rlhf-data first.")
 
     reward_config = config["rlhf"]["reward"]
+    validate_model_runtime(config["model"])
     merged_path = Path(config["rlhf"]["sft_merged_dir"]).resolve()
     if not merged_path.exists():
         raise RuntimeError(f"Merged SFT model does not exist: {merged_path}")
@@ -181,6 +185,7 @@ def train_reward(config: dict[str, Any]) -> Path:
         "max_steps": int(reward_config.get("max_steps", -1)),
         "max_length": int(reward_config["max_sequence_length"]),
         "gradient_checkpointing": True,
+        **training_precision(reward_config),
         "eval_strategy": "steps",
         "save_strategy": "steps",
         "report_to": "none",
@@ -207,6 +212,9 @@ def train_reward(config: dict[str, Any]) -> Path:
         "peft_config": peft_config,
     }
     trainer = RewardTrainer(**supported_kwargs(RewardTrainer, trainer_values))
+    if bool(reward_config.get("fp16")):
+        precision = upcast_trainable_parameters(trainer.model)
+        LOGGER.info("Upcast Reward Model trainable parameters to FP32: %s", precision)
     trainer.train()
     trainer.save_model(str(output_dir))
     tokenizer.save_pretrained(str(output_dir))

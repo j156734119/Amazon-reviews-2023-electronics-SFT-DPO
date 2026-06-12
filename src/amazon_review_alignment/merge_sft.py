@@ -4,6 +4,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from .modeling import sft_merged_path, training_precision, validate_model_runtime
 from .utils import save_run_metadata
 
 LOGGER = logging.getLogger(__name__)
@@ -15,16 +16,24 @@ def merge_sft(config: dict[str, Any]) -> Path:
     from transformers import AutoModelForCausalLM, AutoTokenizer
 
     base_model = config["model"]["base_model"]
+    validate_model_runtime(config["model"])
     adapter_path = Path(config["training"]["sft"]["output_dir"]).resolve()
-    output_dir = Path(config["rlhf"]["sft_merged_dir"]).resolve()
+    output_dir = sft_merged_path(config)
     if not adapter_path.exists():
         raise RuntimeError(f"SFT adapter does not exist: {adapter_path}")
 
-    dtype = torch.float16 if torch.cuda.is_available() else torch.float32
+    precision = training_precision(config["training"]["sft"])
+    dtype = (
+        torch.bfloat16
+        if torch.cuda.is_available() and precision["bf16"]
+        else torch.float16
+        if torch.cuda.is_available()
+        else torch.float32
+    )
     model = AutoModelForCausalLM.from_pretrained(
         base_model,
         trust_remote_code=True,
-        torch_dtype=dtype,
+        dtype=dtype,
         low_cpu_mem_usage=True,
         device_map="auto" if torch.cuda.is_available() else None,
     )

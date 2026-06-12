@@ -17,8 +17,8 @@ LOGGER = logging.getLogger(__name__)
 def prepare_human_evaluation(
     config: dict[str, Any],
     samples: int,
-    left_variant: str = "sft",
-    right_variant: str = "dpo",
+    left_variant: str = "ppo",
+    right_variant: str = "grpo",
 ) -> Path:
     prediction_dir = output_root(config) / "evaluation" / "predictions"
     left_rows = {

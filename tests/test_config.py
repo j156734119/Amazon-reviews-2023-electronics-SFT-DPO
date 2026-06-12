@@ -34,3 +34,19 @@ def test_config_inheritance_rejects_cycles(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="cycle"):
         load_config(first)
+
+
+def test_model_profiles_separate_smoke_and_a100_outputs() -> None:
+    root = Path(__file__).resolve().parents[1]
+    smoke = load_config(root / "configs" / "rlhf_smoke.yaml")
+    a100 = load_config(root / "configs" / "rlhf_a100.yaml")
+
+    assert smoke["model"]["base_model"] == "Qwen/Qwen3-0.6B"
+    assert smoke["training"]["sft"]["fp16"] is True
+    assert smoke["training"]["sft"]["bf16"] is False
+    assert a100["model"]["base_model"] == "Qwen/Qwen3.5-2B"
+    assert a100["training"]["sft"]["fp16"] is False
+    assert a100["training"]["sft"]["bf16"] is True
+    assert a100["rlhf"]["ppo_prompt_count"] == 128
+    assert a100["rlhf"]["grpo"]["prompt_count"] == 128
+    assert smoke["project"]["output_dir"] != a100["project"]["output_dir"]

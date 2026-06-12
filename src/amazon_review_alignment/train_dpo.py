@@ -1,15 +1,20 @@
 from __future__ import annotations
 
 import logging
+from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
 from .config import output_root
 from .modeling import (
-    load_policy_model,
+    load_base_model,
     load_tokenizer,
+    lora_config,
     render_chat,
+    sft_merged_path,
     supported_kwargs,
+    training_precision,
+    upcast_trainable_parameters,
 )
 from .prompts import SYSTEM_PROMPT, analysis_user_prompt
 from .utils import read_jsonl, save_run_metadata, set_seed
@@ -53,14 +58,17 @@ def train_dpo(config: dict[str, Any]) -> Path:
             "Validated teacher preferences are missing. Complete teacher-batch first."
         )
 
-    sft_dir = Path(config["training"]["sft"]["output_dir"]).resolve()
-    if not sft_dir.exists():
-        raise RuntimeError(f"SFT adapter does not exist: {sft_dir}")
-    tokenizer = load_tokenizer(model_config["base_model"], padding_side="left")
+    merged_path = sft_merged_path(config)
+    if not merged_path.exists():
+        raise RuntimeError(
+            f"Merged SFT model does not exist: {merged_path}. Run merge-sft first."
+        )
+    dpo_model_config = deepcopy(model_config)
+    dpo_model_config["base_model"] = str(merged_path)
+    tokenizer = load_tokenizer(str(merged_path), padding_side="left")
     train_dataset = Dataset.from_list(build_dpo_records(train_rows, tokenizer))
     eval_dataset = Dataset.from_list(build_dpo_records(validation_rows, tokenizer))
-    model = load_policy_model(model_config, sft_dir, for_training=True)
-    ref_model = load_policy_model(model_config, sft_dir, for_training=False)
+    model = load_base_model(dpo_model_config, for_training=True)
 
     output_dir = Path(training_config["output_dir"]).resolve()
     common_args = {
@@ -79,6 +87,7 @@ def train_dpo(config: dict[str, Any]) -> Path:
         "max_length": int(model_config["max_sequence_length"]),
         "max_prompt_length": int(model_config["max_sequence_length"]) // 2,
         "gradient_checkpointing": True,
+        **training_precision(training_config),
         "report_to": "none",
         "eval_strategy": "steps",
         "evaluation_strategy": "steps",
@@ -88,14 +97,18 @@ def train_dpo(config: dict[str, Any]) -> Path:
     args = DPOConfig(**supported_kwargs(DPOConfig, common_args))
     trainer_values = {
         "model": model,
-        "ref_model": ref_model,
+        "ref_model": None,
         "args": args,
         "train_dataset": train_dataset,
         "eval_dataset": eval_dataset,
         "processing_class": tokenizer,
         "tokenizer": tokenizer,
+        "peft_config": lora_config(model_config),
     }
     trainer = DPOTrainer(**supported_kwargs(DPOTrainer, trainer_values))
+    if bool(training_config.get("fp16")):
+        precision = upcast_trainable_parameters(trainer.model)
+        LOGGER.info("Upcast DPO trainable parameters to FP32: %s", precision)
     trainer.train()
     trainer.save_model(str(output_dir))
     tokenizer.save_pretrained(str(output_dir))
@@ -105,8 +118,8 @@ def train_dpo(config: dict[str, Any]) -> Path:
         "train-dpo",
         {
             "base_model": model_config["base_model"],
-            "sft_adapter": str(sft_dir),
-            "reference_policy": "independently loaded and frozen SFT policy",
+            "sft_merged_model": str(merged_path),
+            "reference_policy": "merged SFT policy with DPO adapter disabled",
             "train_examples": len(train_rows),
             "validation_examples": len(validation_rows),
         },

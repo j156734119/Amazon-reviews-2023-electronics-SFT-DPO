@@ -29,6 +29,8 @@ teacher:
 
 model:
   base_model: Qwen/Qwen3-0.6B
+  min_transformers_version: 5.5.4
+  sft_merged_dir: outputs/smoke/models/sft-merged
   max_sequence_length: 512
   max_new_tokens: 160
   temperature: 0.0
@@ -51,6 +53,8 @@ training:
     eval_steps: 1
     save_steps: 1
     max_steps: 1
+    fp16: true
+    bf16: false
   dpo:
     output_dir: outputs/smoke/models/dpo
     learning_rate: 0.00005
@@ -63,6 +67,8 @@ training:
     eval_steps: 1
     save_steps: 1
     max_steps: 1
+    fp16: true
+    bf16: false
 
 evaluation:
   variants: [base, sft, dpo]

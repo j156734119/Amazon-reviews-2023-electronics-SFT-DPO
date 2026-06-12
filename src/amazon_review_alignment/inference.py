@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from .config import output_root
-from .modeling import load_policy_model, load_tokenizer, render_chat
+from .modeling import load_policy_model, load_tokenizer, render_chat, sft_merged_path
 from .prompts import SYSTEM_PROMPT, analysis_user_prompt
 from .utils import read_jsonl, save_run_metadata, set_seed, write_jsonl
 
@@ -60,8 +60,8 @@ def adapter_for_variant(config: dict[str, Any], variant: str) -> Path | None:
         return None
     if variant in {"sft", "dpo"}:
         return Path(config["training"][variant]["output_dir"]).resolve()
-    if variant == "ppo":
-        return Path(config["rlhf"]["ppo"]["output_dir"]).resolve()
+    if variant in {"ppo", "grpo"}:
+        return Path(config["rlhf"][variant]["output_dir"]).resolve()
     raise ValueError(f"Unknown model variant: {variant}")
 
 
@@ -70,11 +70,9 @@ def model_config_for_variant(
     variant: str,
 ) -> dict[str, Any]:
     model_config = deepcopy(config["model"])
-    if variant == "ppo":
-        model_config["base_model"] = str(
-            Path(config["rlhf"]["sft_merged_dir"]).resolve()
-        )
-    elif variant not in {"base", "sft", "dpo"}:
+    if variant in {"dpo", "ppo", "grpo"}:
+        model_config["base_model"] = str(sft_merged_path(config))
+    elif variant not in {"base", "sft"}:
         raise ValueError(f"Unknown model variant: {variant}")
     return model_config
 

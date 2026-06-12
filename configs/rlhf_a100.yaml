@@ -1,58 +1,38 @@
 extends: full.yaml
 
-project:
-  output_dir: outputs/t4-qwen3-0.6b
-
-model:
-  base_model: Qwen/Qwen3-0.6B
-  min_transformers_version: 5.5.4
-  sft_merged_dir: outputs/t4-qwen3-0.6b/models/sft-merged
-  max_sequence_length: 512
-  lora_r: 8
-  lora_alpha: 16
-  lora_target_modules: [q_proj, k_proj, v_proj, o_proj]
-
-training:
-  sft:
-    output_dir: outputs/t4-qwen3-0.6b/models/sft
-    per_device_batch_size: 1
-    gradient_accumulation_steps: 8
-    fp16: true
-    bf16: false
-  dpo:
-    output_dir: outputs/t4-qwen3-0.6b/models/dpo
-    per_device_batch_size: 1
-    gradient_accumulation_steps: 16
-    fp16: true
-    bf16: false
-
 rlhf:
   human_calibration_samples: 200
   human_train_fraction: 0.8
   ai_reward_train_pairs: 800
   ai_reward_validation_pairs: 500
-  ppo_prompt_count: 256
-  sft_merged_dir: outputs/t4-qwen3-0.6b/models/sft-merged
+  ppo_prompt_count: 128
+  sft_merged_dir: outputs/a100-qwen3.5-2b/models/sft-merged
   reward:
-    output_dir: outputs/t4-qwen3-0.6b/models/reward
+    output_dir: outputs/a100-qwen3.5-2b/models/reward
     max_sequence_length: 512
     learning_rate: 0.0001
-    epochs: 2
-    per_device_batch_size: 2
-    gradient_accumulation_steps: 8
+    epochs: 1
+    per_device_batch_size: 4
+    gradient_accumulation_steps: 4
     warmup_ratio: 0.05
     logging_steps: 10
     eval_steps: 50
     save_steps: 50
-    fp16: true
-    bf16: false
+    max_steps: -1
+    fp16: false
+    bf16: true
     lora_r: 8
     lora_alpha: 16
     lora_dropout: 0.05
-    lora_target_modules: [q_proj, k_proj, v_proj, o_proj]
+    lora_target_modules:
+      - in_proj_qkv
+      - in_proj_z
+      - out_proj
+      - q_proj
+      - v_proj
   ppo:
-    output_dir: outputs/t4-qwen3-0.6b/models/ppo
-    total_episodes: 256
+    output_dir: outputs/a100-qwen3.5-2b/models/ppo
+    total_episodes: 128
     max_prompt_length: 384
     response_length: 128
     per_device_train_batch_size: 1
@@ -68,23 +48,23 @@ rlhf:
     missing_eos_penalty: 1.0
     logging_steps: 1
     save_steps: 8
-    fp16: true
-    bf16: false
-    max_peak_memory_gb: 15.5
+    fp16: false
+    bf16: true
+    max_peak_memory_gb: 39.0
     lora_r: 8
     lora_alpha: 16
     lora_dropout: 0.05
-    lora_target_modules: [q_proj, v_proj]
+    lora_target_modules: [in_proj_qkv, out_proj, q_proj, v_proj]
   grpo:
-    output_dir: outputs/t4-qwen3-0.6b/models/grpo
-    prompt_count: 256
+    output_dir: outputs/a100-qwen3.5-2b/models/grpo
+    prompt_count: 128
     num_generations: 4
     max_prompt_length: 384
     max_completion_length: 128
     learning_rate: 0.000003
     epochs: 1
     per_device_train_batch_size: 1
-    gradient_accumulation_steps: 8
+    gradient_accumulation_steps: 4
     generation_batch_size: 4
     num_iterations: 1
     beta: 0.02
@@ -96,13 +76,13 @@ rlhf:
     logging_steps: 1
     save_steps: 8
     max_steps: -1
-    fp16: true
-    bf16: false
-    max_peak_memory_gb: 15.5
+    fp16: false
+    bf16: true
+    max_peak_memory_gb: 39.0
     lora_r: 8
     lora_alpha: 16
     lora_dropout: 0.05
-    lora_target_modules: [q_proj, v_proj]
+    lora_target_modules: [in_proj_qkv, out_proj, q_proj, v_proj]
     reward_weights:
       reward_model: 1.0
       schema: 1.0
@@ -111,6 +91,7 @@ rlhf:
 
 evaluation:
   variants: [base, sft, dpo, ppo, grpo]
+  max_test_samples: 500
   judge_pairs:
     - [base, sft]
     - [sft, dpo]

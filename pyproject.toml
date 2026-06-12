@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "amazon-review-alignment"
 version = "0.1.0"
-description = "Reproducible SFT and DPO pipeline for evidence-grounded Amazon review analysis"
+description = "Reproducible SFT, DPO, PPO, and GRPO pipeline for grounded review analysis"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {file = "LICENSE"}
@@ -23,15 +23,17 @@ dependencies = [
 train = [
   "accelerate>=1.4",
   "bitsandbytes>=0.45; platform_system == 'Linux'",
-  "peft>=0.14",
+  "packaging>=24",
+  "peft>=0.18",
   "torch>=2.4",
-  "transformers>=4.56.2,<6",
+  "transformers==5.5.4",
   "trl==1.5.1",
 ]
 eval = [
   "matplotlib>=3.8",
 ]
 dev = [
+  "nbformat>=5.10",
   "pytest>=8.2",
   "ruff>=0.9",
 ]
