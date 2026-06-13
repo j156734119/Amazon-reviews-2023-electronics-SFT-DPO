@@ -32,6 +32,7 @@ rlhf:
       - v_proj
   ppo:
     output_dir: outputs/a100-qwen3.5-2b/models/ppo
+    auxiliary_model_load_in_4bit: false
     total_episodes: 128
     max_prompt_length: 384
     response_length: 128
@@ -57,6 +58,7 @@ rlhf:
     lora_target_modules: [in_proj_qkv, out_proj, q_proj, v_proj]
   grpo:
     output_dir: outputs/a100-qwen3.5-2b/models/grpo
+    auxiliary_model_load_in_4bit: false
     prompt_count: 128
     num_generations: 4
     max_prompt_length: 384

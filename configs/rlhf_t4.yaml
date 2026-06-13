@@ -52,6 +52,7 @@ rlhf:
     lora_target_modules: [q_proj, k_proj, v_proj, o_proj]
   ppo:
     output_dir: outputs/t4-qwen3-0.6b/models/ppo
+    auxiliary_model_load_in_4bit: true
     total_episodes: 256
     max_prompt_length: 384
     response_length: 128
@@ -77,6 +78,7 @@ rlhf:
     lora_target_modules: [q_proj, v_proj]
   grpo:
     output_dir: outputs/t4-qwen3-0.6b/models/grpo
+    auxiliary_model_load_in_4bit: true
     prompt_count: 256
     num_generations: 4
     max_prompt_length: 384

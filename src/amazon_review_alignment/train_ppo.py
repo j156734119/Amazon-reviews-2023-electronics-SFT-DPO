@@ -23,6 +23,18 @@ from .utils import read_jsonl, save_run_metadata, set_seed, write_json
 LOGGER = logging.getLogger(__name__)
 
 
+def auxiliary_model_loading_kwargs(
+    model_config: dict[str, Any],
+    load_in_4bit: bool,
+    dtype: Any | None,
+) -> dict[str, Any]:
+    if load_in_4bit:
+        return quantization_kwargs(model_config)
+    if dtype is None:
+        raise ValueError("A dtype is required for non-quantized auxiliary models.")
+    return {"dtype": dtype}
+
+
 def build_ppo_records(
     rows: list[dict[str, Any]],
     tokenizer: Any,
@@ -55,28 +67,40 @@ def _load_reward_adapter(
     model_config: dict[str, Any],
     trainable: bool,
     pad_token_id: int,
+    load_in_4bit: bool = True,
+    dtype: Any | None = None,
 ) -> Any:
     from peft import PeftModel, prepare_model_for_kbit_training
     from transformers import AutoModelForSequenceClassification
 
     validate_model_runtime(model_config)
+    loading_kwargs = auxiliary_model_loading_kwargs(
+        model_config,
+        load_in_4bit,
+        dtype,
+    )
     model = AutoModelForSequenceClassification.from_pretrained(
         str(merged_path),
         num_labels=1,
         trust_remote_code=True,
-        **quantization_kwargs(model_config),
+        **loading_kwargs,
     )
     model.config.pad_token_id = pad_token_id
-    if trainable:
+    model.config.use_cache = False
+    if trainable and load_in_4bit:
         model = prepare_model_for_kbit_training(
             model,
             use_gradient_checkpointing=True,
         )
+    elif hasattr(model, "gradient_checkpointing_disable"):
+        model.gradient_checkpointing_disable()
     model = PeftModel.from_pretrained(
         model,
         str(reward_path),
         is_trainable=trainable,
     )
+    if not load_in_4bit:
+        model = model.to(dtype=dtype)
     if not trainable:
         for parameter in model.parameters():
             parameter.requires_grad = False
@@ -153,12 +177,18 @@ def train_ppo(config: dict[str, Any]) -> Path:
         policy,
         use_gradient_checkpointing=True,
     )
+    policy_dtype = torch.bfloat16 if bool(ppo_config.get("bf16")) else torch.float16
+    auxiliary_load_in_4bit = bool(
+        ppo_config.get("auxiliary_model_load_in_4bit", True)
+    )
     reward_model = _load_reward_adapter(
         merged_path,
         reward_path,
         config["model"],
         trainable=False,
         pad_token_id=tokenizer.pad_token_id,
+        load_in_4bit=auxiliary_load_in_4bit,
+        dtype=policy_dtype,
     )
     value_model = _load_reward_adapter(
         merged_path,
@@ -166,15 +196,23 @@ def train_ppo(config: dict[str, Any]) -> Path:
         config["model"],
         trainable=True,
         pad_token_id=tokenizer.pad_token_id,
+        load_in_4bit=auxiliary_load_in_4bit,
+        dtype=policy_dtype,
     )
-    policy_dtype = torch.bfloat16 if bool(ppo_config.get("bf16")) else torch.float16
+    auxiliary_dtype = torch.float32 if auxiliary_load_in_4bit else policy_dtype
     for name, model, conv_dtype in (
         ("policy", policy, policy_dtype),
-        ("reward", reward_model, torch.float32),
-        ("value", value_model, torch.float32),
+        ("reward", reward_model, auxiliary_dtype),
+        ("value", value_model, auxiliary_dtype),
     ):
         aligned = align_conv1d_dtype(model, conv_dtype)
         LOGGER.info("Aligned %s Conv1d modules for PPO generation: %s", name, aligned)
+    LOGGER.info(
+        "PPO auxiliary models: load_in_4bit=%s, dtype=%s, "
+        "gradient_checkpointing=false",
+        auxiliary_load_in_4bit,
+        auxiliary_dtype,
+    )
 
     output_dir = Path(ppo_config["output_dir"]).resolve()
     values = {
@@ -267,6 +305,8 @@ def train_ppo(config: dict[str, Any]) -> Path:
         "peak_cuda_memory_reserved_gb": peak_reserved_gb,
         "final_logged_metrics": final_metrics,
         "reference_policy": "merged SFT policy with PPO adapter disabled",
+        "auxiliary_model_load_in_4bit": auxiliary_load_in_4bit,
+        "auxiliary_model_dtype": str(auxiliary_dtype),
     }
     rlhf_dir = output_root(config) / "rlhf"
     write_json(rlhf_dir / "ppo_metrics.json", summary)

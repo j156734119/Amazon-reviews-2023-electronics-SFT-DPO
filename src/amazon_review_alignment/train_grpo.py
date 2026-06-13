@@ -170,22 +170,33 @@ def train_grpo(config: dict[str, Any]) -> Path:
         policy,
         use_gradient_checkpointing=True,
     )
+    policy_dtype = (
+        torch.bfloat16 if bool(grpo_config.get("bf16")) else torch.float16
+    )
+    auxiliary_load_in_4bit = bool(
+        grpo_config.get("auxiliary_model_load_in_4bit", True)
+    )
     reward_model = _load_reward_adapter(
         merged_path,
         reward_path,
         config["model"],
         trainable=False,
         pad_token_id=tokenizer.pad_token_id,
+        load_in_4bit=auxiliary_load_in_4bit,
+        dtype=policy_dtype,
     )
-    policy_dtype = (
-        torch.bfloat16 if bool(grpo_config.get("bf16")) else torch.float16
-    )
+    auxiliary_dtype = torch.float32 if auxiliary_load_in_4bit else policy_dtype
     for name, model, conv_dtype in (
         ("policy", policy, policy_dtype),
-        ("reward", reward_model, torch.float32),
+        ("reward", reward_model, auxiliary_dtype),
     ):
         aligned = align_conv1d_dtype(model, conv_dtype)
         LOGGER.info("Aligned %s Conv1d modules for GRPO generation: %s", name, aligned)
+    LOGGER.info(
+        "GRPO auxiliary reward model: load_in_4bit=%s, dtype=%s",
+        auxiliary_load_in_4bit,
+        auxiliary_dtype,
+    )
 
     output_dir = Path(grpo_config["output_dir"]).resolve()
     values = grpo_argument_values(config, output_dir)
@@ -254,6 +265,8 @@ def train_grpo(config: dict[str, Any]) -> Path:
         "final_logged_metrics": final_metrics,
         "reference_policy": "merged SFT policy with GRPO adapter disabled",
         "reward_weights": grpo_config["reward_weights"],
+        "auxiliary_model_load_in_4bit": auxiliary_load_in_4bit,
+        "auxiliary_model_dtype": str(auxiliary_dtype),
     }
     write_json(rlhf_dir / "grpo_metrics.json", summary)
     save_run_metadata(output_dir, config, "train-grpo", summary)

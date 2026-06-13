@@ -363,13 +363,19 @@ def a100_run_mode_cells() -> list[dict[str, Any]]:
                     encoding="utf-8",
                 )
                 CONFIG = str(mini_path)
+                effective = merged
             elif RUN_MODE == "formal":
                 CONFIG = "configs/rlhf_a100.yaml"
+                effective = load_config(REPO_DIR / CONFIG)
             else:
                 raise ValueError("RUN_MODE must be 'mini' or 'formal'.")
 
             print("Run mode:", RUN_MODE)
             print("Effective config:", CONFIG)
+            print(
+                "PPO auxiliary models in 4-bit:",
+                effective["rlhf"]["ppo"]["auxiliary_model_load_in_4bit"],
+            )
             """
         ),
     ]

@@ -27,6 +27,7 @@ rlhf:
     lora_target_modules: [q_proj, v_proj]
   ppo:
     output_dir: outputs/smoke/models/ppo
+    auxiliary_model_load_in_4bit: true
     total_episodes: 4
     max_prompt_length: 192
     response_length: 64
@@ -52,6 +53,7 @@ rlhf:
     lora_target_modules: [q_proj, v_proj]
   grpo:
     output_dir: outputs/smoke/models/grpo
+    auxiliary_model_load_in_4bit: true
     prompt_count: 4
     num_generations: 2
     max_prompt_length: 192

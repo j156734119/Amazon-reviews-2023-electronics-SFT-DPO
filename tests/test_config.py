@@ -50,7 +50,10 @@ def test_model_profiles_separate_smoke_and_a100_outputs() -> None:
     assert a100["training"]["sft"]["bf16"] is True
     assert a100["rlhf"]["human_calibration_samples"] == 0
     assert a100["rlhf"]["ppo_prompt_count"] == 128
+    assert a100["rlhf"]["ppo"]["auxiliary_model_load_in_4bit"] is False
     assert a100["rlhf"]["grpo"]["prompt_count"] == 128
+    assert a100["rlhf"]["grpo"]["auxiliary_model_load_in_4bit"] is False
+    assert smoke["rlhf"]["ppo"]["auxiliary_model_load_in_4bit"] is True
     assert smoke["project"]["output_dir"] != a100["project"]["output_dir"]
 
 

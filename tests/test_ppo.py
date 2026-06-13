@@ -1,7 +1,11 @@
 import pytest
+import torch
 
 from amazon_review_alignment.inference import model_config_for_variant
-from amazon_review_alignment.train_ppo import _finite_ppo_metrics
+from amazon_review_alignment.train_ppo import (
+    _finite_ppo_metrics,
+    auxiliary_model_loading_kwargs,
+)
 
 
 def test_online_and_dpo_variants_use_merged_sft_base(tmp_path) -> None:
@@ -41,3 +45,23 @@ def test_ppo_metrics_extract_final_values() -> None:
 
     assert metrics["objective/kl"] == 0.05
     assert metrics["loss/policy_avg"] == 0.2
+
+
+def test_a100_auxiliary_models_load_in_native_bf16() -> None:
+    kwargs = auxiliary_model_loading_kwargs(
+        {"load_in_4bit": True},
+        load_in_4bit=False,
+        dtype=torch.bfloat16,
+    )
+
+    assert kwargs == {"dtype": torch.bfloat16}
+    assert "quantization_config" not in kwargs
+
+
+def test_non_quantized_auxiliary_models_require_dtype() -> None:
+    with pytest.raises(ValueError, match="dtype is required"):
+        auxiliary_model_loading_kwargs(
+            {"load_in_4bit": True},
+            load_in_4bit=False,
+            dtype=None,
+        )
