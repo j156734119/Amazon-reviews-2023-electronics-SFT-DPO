@@ -115,6 +115,105 @@ def install_conv1d_runtime_dtype_hooks(model: Any) -> dict[str, int]:
     return {"conv1d_runtime_hooks": installed}
 
 
+def model_device_report(model: Any) -> dict[str, Any]:
+    parameter_devices = sorted({str(parameter.device) for parameter in model.parameters()})
+    parameter_dtypes = sorted({str(parameter.dtype) for parameter in model.parameters()})
+    buffer_devices = sorted({str(buffer.device) for buffer in model.buffers()})
+    embedding = model.get_input_embeddings()
+    score = getattr(model, "score", None)
+    if score is None and hasattr(model, "get_base_model"):
+        score = getattr(model.get_base_model(), "score", None)
+    score_parameters = list(score.parameters()) if score is not None else []
+    return {
+        "parameter_devices": parameter_devices,
+        "parameter_dtypes": parameter_dtypes,
+        "buffer_devices": buffer_devices,
+        "embedding_device": str(embedding.weight.device),
+        "embedding_dtype": str(embedding.weight.dtype),
+        "score_device": (
+            str(score_parameters[0].device) if score_parameters else None
+        ),
+        "score_dtype": str(score_parameters[0].dtype) if score_parameters else None,
+    }
+
+
+def assert_model_on_device(model: Any, expected_device: Any, name: str) -> dict[str, Any]:
+    import torch
+
+    expected = torch.device(expected_device)
+    mismatches = []
+    for parameter_name, parameter in model.named_parameters():
+        if parameter.device != expected:
+            mismatches.append(f"parameter {parameter_name}={parameter.device}")
+    for buffer_name, buffer in model.named_buffers():
+        if buffer.device != expected:
+            mismatches.append(f"buffer {buffer_name}={buffer.device}")
+    if mismatches:
+        details = ", ".join(mismatches[:8])
+        if len(mismatches) > 8:
+            details += f", ... ({len(mismatches)} total)"
+        raise RuntimeError(
+            f"{name} is not fully placed on {expected}: {details}"
+        )
+    return model_device_report(model)
+
+
+def place_auxiliary_model(
+    model: Any,
+    device: Any,
+    dtype: Any,
+    load_in_4bit: bool,
+    name: str,
+) -> dict[str, Any]:
+    if load_in_4bit:
+        return model_device_report(model)
+    model.to(device=device, dtype=dtype)
+    return assert_model_on_device(model, device, name)
+
+
+def validate_reward_model_forward(
+    model: Any,
+    tokenizer: Any,
+    text: str,
+    device: Any,
+    max_length: int,
+    name: str,
+) -> dict[str, Any]:
+    import torch
+
+    expected_device = torch.device(device)
+    assert_model_on_device(model, expected_device, name)
+    inputs = tokenizer(
+        text,
+        return_tensors="pt",
+        truncation=True,
+        max_length=max_length,
+    )
+    inputs = {key: value.to(expected_device) for key, value in inputs.items()}
+    was_training = model.training
+    model.eval()
+    try:
+        with torch.inference_mode():
+            logits = model(**inputs).logits
+    finally:
+        model.train(was_training)
+    if logits.shape != (1, 1):
+        raise RuntimeError(
+            f"{name} preflight expected logits shape (1, 1), got {tuple(logits.shape)}."
+        )
+    if logits.device != expected_device:
+        raise RuntimeError(
+            f"{name} preflight logits are on {logits.device}, expected {expected_device}."
+        )
+    if not torch.isfinite(logits).all():
+        raise RuntimeError(f"{name} preflight produced non-finite logits.")
+    return {
+        "logits_shape": list(logits.shape),
+        "logits_device": str(logits.device),
+        "logits_dtype": str(logits.dtype),
+    }
+
+
 def validate_model_runtime(model_config: dict[str, Any]) -> None:
     minimum = model_config.get("min_transformers_version")
     if not minimum:

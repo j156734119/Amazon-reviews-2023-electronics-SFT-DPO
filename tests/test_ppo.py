@@ -1,6 +1,7 @@
 import pytest
 import torch
 
+import amazon_review_alignment.train_ppo as train_ppo_module
 from amazon_review_alignment.inference import model_config_for_variant
 from amazon_review_alignment.train_ppo import (
     _finite_ppo_metrics,
@@ -56,7 +57,6 @@ def test_a100_auxiliary_models_load_in_native_bf16() -> None:
 
     assert kwargs == {
         "dtype": torch.bfloat16,
-        "device_map": "auto",
     }
     assert "quantization_config" not in kwargs
 
@@ -68,3 +68,20 @@ def test_non_quantized_auxiliary_models_require_dtype() -> None:
             load_in_4bit=False,
             dtype=None,
         )
+
+
+def test_quantized_auxiliary_models_keep_quantization_loading(monkeypatch) -> None:
+    expected = {"quantization_config": object(), "device_map": "auto"}
+    monkeypatch.setattr(
+        train_ppo_module,
+        "quantization_kwargs",
+        lambda _config: expected,
+    )
+
+    kwargs = auxiliary_model_loading_kwargs(
+        {"load_in_4bit": True},
+        load_in_4bit=True,
+        dtype=torch.float16,
+    )
+
+    assert kwargs is expected

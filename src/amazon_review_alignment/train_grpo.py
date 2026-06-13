@@ -10,14 +10,17 @@ from .config import output_root
 from .grpo_rewards import evidence_reward, length_reward, schema_reward
 from .modeling import (
     align_conv1d_dtype,
+    assert_model_on_device,
     install_conv1d_runtime_dtype_hooks,
     load_tokenizer,
+    model_device_report,
     quantization_kwargs,
     render_chat,
     sft_merged_path,
     supported_kwargs,
     training_precision,
     upcast_trainable_parameters,
+    validate_reward_model_forward,
 )
 from .prompts import SYSTEM_PROMPT, analysis_user_prompt
 from .train_ppo import _load_reward_adapter
@@ -174,6 +177,7 @@ def train_grpo(config: dict[str, Any]) -> Path:
     policy_dtype = (
         torch.bfloat16 if bool(grpo_config.get("bf16")) else torch.float16
     )
+    training_device = torch.device("cuda", torch.cuda.current_device())
     auxiliary_load_in_4bit = bool(
         grpo_config.get("auxiliary_model_load_in_4bit", True)
     )
@@ -185,8 +189,10 @@ def train_grpo(config: dict[str, Any]) -> Path:
         pad_token_id=tokenizer.pad_token_id,
         load_in_4bit=auxiliary_load_in_4bit,
         dtype=policy_dtype,
+        device=training_device,
     )
     auxiliary_dtype = torch.float32 if auxiliary_load_in_4bit else policy_dtype
+    model_reports = {}
     for name, model, conv_dtype in (
         ("policy", policy, policy_dtype),
         ("reward", reward_model, auxiliary_dtype),
@@ -195,6 +201,19 @@ def train_grpo(config: dict[str, Any]) -> Path:
         LOGGER.info("Aligned %s Conv1d modules for GRPO generation: %s", name, aligned)
         hooks = install_conv1d_runtime_dtype_hooks(model)
         LOGGER.info("Installed %s Conv1d runtime dtype hooks: %s", name, hooks)
+        model_reports[name] = model_device_report(model)
+        LOGGER.info("%s device report: %s", name, model_reports[name])
+    preflight_reports = {}
+    if not auxiliary_load_in_4bit:
+        preflight_reports["reward"] = validate_reward_model_forward(
+            reward_model,
+            tokenizer,
+            analysis_user_prompt(rows[0]["text"]),
+            training_device,
+            int(config["rlhf"]["reward"]["max_sequence_length"]),
+            "GRPO Reward Model",
+        )
+        LOGGER.info("GRPO Reward Model preflight: %s", preflight_reports["reward"])
     LOGGER.info(
         "GRPO auxiliary reward model: load_in_4bit=%s, dtype=%s",
         auxiliary_load_in_4bit,
@@ -227,6 +246,15 @@ def train_grpo(config: dict[str, Any]) -> Path:
         "peft_config": peft_config,
     }
     trainer = GRPOTrainer(**supported_kwargs(GRPOTrainer, trainer_values))
+    trainer_device_reports = {}
+    if not auxiliary_load_in_4bit:
+        report = assert_model_on_device(
+            trainer.reward_funcs[0],
+            training_device,
+            "GRPO Reward Model after trainer setup",
+        )
+        trainer_device_reports["reward"] = report
+        LOGGER.info("GRPO Reward Model after trainer setup: %s", report)
     if bool(grpo_config.get("fp16")):
         precision = upcast_trainable_parameters(trainer.model)
         LOGGER.info("Upcast GRPO trainable parameters to FP32: %s", precision)
@@ -270,6 +298,9 @@ def train_grpo(config: dict[str, Any]) -> Path:
         "reward_weights": grpo_config["reward_weights"],
         "auxiliary_model_load_in_4bit": auxiliary_load_in_4bit,
         "auxiliary_model_dtype": str(auxiliary_dtype),
+        "model_device_reports": model_reports,
+        "auxiliary_preflight_reports": preflight_reports,
+        "trainer_device_reports": trainer_device_reports,
     }
     write_json(rlhf_dir / "grpo_metrics.json", summary)
     save_run_metadata(output_dir, config, "train-grpo", summary)

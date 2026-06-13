@@ -9,14 +9,18 @@ from typing import Any
 from .config import output_root
 from .modeling import (
     align_conv1d_dtype,
+    assert_model_on_device,
     install_conv1d_runtime_dtype_hooks,
     load_tokenizer,
+    model_device_report,
+    place_auxiliary_model,
     quantization_kwargs,
     render_chat,
     supported_kwargs,
     training_precision,
     upcast_trainable_parameters,
     validate_model_runtime,
+    validate_reward_model_forward,
 )
 from .prompts import SYSTEM_PROMPT, analysis_user_prompt
 from .utils import read_jsonl, save_run_metadata, set_seed, write_json
@@ -33,7 +37,7 @@ def auxiliary_model_loading_kwargs(
         return quantization_kwargs(model_config)
     if dtype is None:
         raise ValueError("A dtype is required for non-quantized auxiliary models.")
-    return {"dtype": dtype, "device_map": "auto"}
+    return {"dtype": dtype}
 
 
 def build_ppo_records(
@@ -70,6 +74,7 @@ def _load_reward_adapter(
     pad_token_id: int,
     load_in_4bit: bool = True,
     dtype: Any | None = None,
+    device: Any | None = None,
 ) -> Any:
     from peft import PeftModel, prepare_model_for_kbit_training
     from transformers import AutoModelForSequenceClassification
@@ -101,7 +106,15 @@ def _load_reward_adapter(
         is_trainable=trainable,
     )
     if not load_in_4bit:
-        model = model.to(dtype=dtype)
+        if device is None:
+            raise ValueError("A device is required for non-quantized auxiliary models.")
+        place_auxiliary_model(
+            model,
+            device=device,
+            dtype=dtype,
+            load_in_4bit=False,
+            name="Reward/Value Model",
+        )
     if not trainable:
         for parameter in model.parameters():
             parameter.requires_grad = False
@@ -179,6 +192,7 @@ def train_ppo(config: dict[str, Any]) -> Path:
         use_gradient_checkpointing=True,
     )
     policy_dtype = torch.bfloat16 if bool(ppo_config.get("bf16")) else torch.float16
+    training_device = torch.device("cuda", torch.cuda.current_device())
     auxiliary_load_in_4bit = bool(
         ppo_config.get("auxiliary_model_load_in_4bit", True)
     )
@@ -190,6 +204,7 @@ def train_ppo(config: dict[str, Any]) -> Path:
         pad_token_id=tokenizer.pad_token_id,
         load_in_4bit=auxiliary_load_in_4bit,
         dtype=policy_dtype,
+        device=training_device,
     )
     value_model = _load_reward_adapter(
         merged_path,
@@ -199,8 +214,10 @@ def train_ppo(config: dict[str, Any]) -> Path:
         pad_token_id=tokenizer.pad_token_id,
         load_in_4bit=auxiliary_load_in_4bit,
         dtype=policy_dtype,
+        device=training_device,
     )
     auxiliary_dtype = torch.float32 if auxiliary_load_in_4bit else policy_dtype
+    model_reports = {}
     for name, model, conv_dtype in (
         ("policy", policy, policy_dtype),
         ("reward", reward_model, auxiliary_dtype),
@@ -210,6 +227,28 @@ def train_ppo(config: dict[str, Any]) -> Path:
         LOGGER.info("Aligned %s Conv1d modules for PPO generation: %s", name, aligned)
         hooks = install_conv1d_runtime_dtype_hooks(model)
         LOGGER.info("Installed %s Conv1d runtime dtype hooks: %s", name, hooks)
+        model_reports[name] = model_device_report(model)
+        LOGGER.info("%s device report: %s", name, model_reports[name])
+    preflight_reports = {}
+    if not auxiliary_load_in_4bit:
+        preflight_reports["reward"] = validate_reward_model_forward(
+            reward_model,
+            tokenizer,
+            analysis_user_prompt(prompt_rows[0]["text"]),
+            training_device,
+            int(config["rlhf"]["reward"]["max_sequence_length"]),
+            "PPO Reward Model",
+        )
+        preflight_reports["value"] = validate_reward_model_forward(
+            value_model,
+            tokenizer,
+            analysis_user_prompt(prompt_rows[0]["text"]),
+            training_device,
+            int(config["rlhf"]["reward"]["max_sequence_length"]),
+            "PPO Value Model",
+        )
+        LOGGER.info("PPO Reward Model preflight: %s", preflight_reports["reward"])
+        LOGGER.info("PPO Value Model preflight: %s", preflight_reports["value"])
     LOGGER.info(
         "PPO auxiliary models: load_in_4bit=%s, dtype=%s, "
         "gradient_checkpointing=false",
@@ -272,6 +311,15 @@ def train_ppo(config: dict[str, Any]) -> Path:
         "peft_config": peft_config,
     }
     trainer = PPOTrainer(**supported_kwargs(PPOTrainer, trainer_values))
+    trainer_device_reports = {}
+    if not auxiliary_load_in_4bit:
+        for name, model in (
+            ("PPO Reward Model after trainer setup", trainer.reward_model),
+            ("PPO Value Model after trainer setup", trainer.value_model),
+        ):
+            report = assert_model_on_device(model, training_device, name)
+            trainer_device_reports[name] = report
+            LOGGER.info("%s device report: %s", name, report)
     if bool(ppo_config.get("fp16")):
         precision = upcast_trainable_parameters(trainer.model)
         LOGGER.info("Upcast PPO trainable parameters to FP32: %s", precision)
@@ -310,6 +358,9 @@ def train_ppo(config: dict[str, Any]) -> Path:
         "reference_policy": "merged SFT policy with PPO adapter disabled",
         "auxiliary_model_load_in_4bit": auxiliary_load_in_4bit,
         "auxiliary_model_dtype": str(auxiliary_dtype),
+        "model_device_reports": model_reports,
+        "auxiliary_preflight_reports": preflight_reports,
+        "trainer_device_reports": trainer_device_reports,
     }
     rlhf_dir = output_root(config) / "rlhf"
     write_json(rlhf_dir / "ppo_metrics.json", summary)
