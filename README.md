@@ -173,9 +173,8 @@ clipping, completion lengths, runtime, and memory.
 
 ## Independent Colab notebook
 
-The repository contains a Python generator rather than a tracked `.ipynb`, so
-GitHub language statistics remain Python-focused. Generate the standalone
-notebook outside this repository with:
+The fully self-contained notebook variant is generated outside the repository
+from a Python generator. Generate that standalone copy with:
 
 ```powershell
 python tools/build_colab_notebook.py `
@@ -186,6 +185,18 @@ The notebook contains its own data, model, training, evaluation, Drive
 persistence, and checkpoint-resume code. It does not import this package. Keep
 `PROFILE="smoke"` for Qwen3-0.6B, then switch to `PROFILE="a100"` for
 Qwen3.5-2B after the complete smoke run succeeds.
+
+## Tracked Colab workflows
+
+Two repository-driven notebooks are tracked for running the package directly
+from GitHub:
+
+- `Amazon_Review_Alignment_T4_Smoke.ipynb`: Qwen3-0.6B end-to-end smoke.
+- `Amazon_Review_Alignment_A100.ipynb`: Qwen3.5-2B formal A100 workflow.
+
+They mount Google Drive, clone the `main` branch, install the package, call the
+same CLI as the Python project, and keep ignored training outputs in the Drive
+workspace. Push local source changes before opening either notebook in Colab.
 
 ## Teacher generation and cost control
 
