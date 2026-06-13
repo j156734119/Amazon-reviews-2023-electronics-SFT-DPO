@@ -71,6 +71,50 @@ def align_conv1d_dtype(
     }
 
 
+def install_conv1d_runtime_dtype_hooks(model: Any) -> dict[str, int]:
+    import torch
+
+    installed = 0
+    for module in model.modules():
+        if not isinstance(module, torch.nn.Conv1d):
+            continue
+        if getattr(module, "_review_align_dtype_hooks", False):
+            continue
+
+        module._review_align_input_dtypes = []
+
+        def align_input(conv: Any, args: tuple[Any, ...]) -> tuple[Any, ...] | None:
+            if not args or not isinstance(args[0], torch.Tensor):
+                conv._review_align_input_dtypes.append(None)
+                return None
+            input_tensor = args[0]
+            conv._review_align_input_dtypes.append(input_tensor.dtype)
+            target_dtype = conv.weight.dtype
+            if input_tensor.dtype == target_dtype:
+                return None
+            return (input_tensor.to(dtype=target_dtype), *args[1:])
+
+        def restore_output(
+            conv: Any,
+            _args: tuple[Any, ...],
+            output: Any,
+        ) -> Any:
+            original_dtype = conv._review_align_input_dtypes.pop()
+            if (
+                original_dtype is not None
+                and isinstance(output, torch.Tensor)
+                and output.dtype != original_dtype
+            ):
+                return output.to(dtype=original_dtype)
+            return output
+
+        module.register_forward_pre_hook(align_input)
+        module.register_forward_hook(restore_output)
+        module._review_align_dtype_hooks = True
+        installed += 1
+    return {"conv1d_runtime_hooks": installed}
+
+
 def validate_model_runtime(model_config: dict[str, Any]) -> None:
     minimum = model_config.get("min_transformers_version")
     if not minimum:

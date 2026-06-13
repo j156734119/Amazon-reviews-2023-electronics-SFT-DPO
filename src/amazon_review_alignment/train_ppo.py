@@ -9,6 +9,7 @@ from typing import Any
 from .config import output_root
 from .modeling import (
     align_conv1d_dtype,
+    install_conv1d_runtime_dtype_hooks,
     load_tokenizer,
     quantization_kwargs,
     render_chat,
@@ -207,6 +208,8 @@ def train_ppo(config: dict[str, Any]) -> Path:
     ):
         aligned = align_conv1d_dtype(model, conv_dtype)
         LOGGER.info("Aligned %s Conv1d modules for PPO generation: %s", name, aligned)
+        hooks = install_conv1d_runtime_dtype_hooks(model)
+        LOGGER.info("Installed %s Conv1d runtime dtype hooks: %s", name, hooks)
     LOGGER.info(
         "PPO auxiliary models: load_in_4bit=%s, dtype=%s, "
         "gradient_checkpointing=false",

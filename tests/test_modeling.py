@@ -3,6 +3,7 @@ import torch
 
 from amazon_review_alignment.modeling import (
     align_conv1d_dtype,
+    install_conv1d_runtime_dtype_hooks,
     training_precision,
     upcast_trainable_parameters,
 )
@@ -63,3 +64,29 @@ def test_align_conv1d_dtype_supports_reward_float32() -> None:
     assert model.weight.dtype == torch.float32
     assert model.bias.dtype == torch.float32
     assert result["dtype"] == "torch.float32"
+
+
+@pytest.mark.parametrize(
+    ("input_dtype", "weight_dtype"),
+    [
+        (torch.bfloat16, torch.float32),
+        (torch.float32, torch.bfloat16),
+    ],
+)
+def test_conv1d_runtime_hooks_bridge_mixed_dtypes(
+    input_dtype: torch.dtype,
+    weight_dtype: torch.dtype,
+) -> None:
+    model = torch.nn.Conv1d(2, 2, 3, dtype=weight_dtype)
+    result = install_conv1d_runtime_dtype_hooks(model)
+    inputs = torch.ones(1, 2, 5, dtype=input_dtype, requires_grad=True)
+
+    output = model(inputs)
+    output.float().sum().backward()
+
+    assert output.dtype == input_dtype
+    assert inputs.grad is not None
+    assert result == {"conv1d_runtime_hooks": 1}
+    assert install_conv1d_runtime_dtype_hooks(model) == {
+        "conv1d_runtime_hooks": 0
+    }

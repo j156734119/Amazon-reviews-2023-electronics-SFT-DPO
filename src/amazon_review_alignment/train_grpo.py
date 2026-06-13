@@ -10,6 +10,7 @@ from .config import output_root
 from .grpo_rewards import evidence_reward, length_reward, schema_reward
 from .modeling import (
     align_conv1d_dtype,
+    install_conv1d_runtime_dtype_hooks,
     load_tokenizer,
     quantization_kwargs,
     render_chat,
@@ -192,6 +193,8 @@ def train_grpo(config: dict[str, Any]) -> Path:
     ):
         aligned = align_conv1d_dtype(model, conv_dtype)
         LOGGER.info("Aligned %s Conv1d modules for GRPO generation: %s", name, aligned)
+        hooks = install_conv1d_runtime_dtype_hooks(model)
+        LOGGER.info("Installed %s Conv1d runtime dtype hooks: %s", name, hooks)
     LOGGER.info(
         "GRPO auxiliary reward model: load_in_4bit=%s, dtype=%s",
         auxiliary_load_in_4bit,

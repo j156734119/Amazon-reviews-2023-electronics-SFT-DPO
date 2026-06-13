@@ -196,7 +196,7 @@ def common_setup_cells(gpu_name: str, config_path: str) -> list[dict[str, Any]]:
                     sys.executable,
                     "-m",
                     "amazon_review_alignment.cli",
-                    *arguments,
+                    *(str(argument) for argument in arguments),
                 ]
                 print("\\n$", " ".join(command))
                 process = subprocess.Popen(
