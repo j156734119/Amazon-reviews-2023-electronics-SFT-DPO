@@ -50,12 +50,10 @@ def training_precision(training_config: dict[str, Any]) -> dict[str, bool]:
 
 def align_conv1d_dtype(
     model: Any,
-    training_config: dict[str, Any],
+    dtype: Any,
 ) -> dict[str, int | str]:
     import torch
 
-    precision = training_precision(training_config)
-    dtype = torch.bfloat16 if precision["bf16"] else torch.float16
     modules = 0
     parameters = 0
     for module in model.modules():

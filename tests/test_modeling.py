@@ -46,10 +46,20 @@ def test_align_conv1d_dtype_preserves_other_modules() -> None:
         torch.nn.Linear(2, 2, dtype=torch.float32),
     )
 
-    result = align_conv1d_dtype(model, {"fp16": False, "bf16": True})
+    result = align_conv1d_dtype(model, torch.bfloat16)
 
     assert model[0].weight.dtype == torch.bfloat16
     assert model[0].bias.dtype == torch.bfloat16
     assert model[1].weight.dtype == torch.float32
     assert result["conv1d_modules"] == 1
     assert result["dtype"] == "torch.bfloat16"
+
+
+def test_align_conv1d_dtype_supports_reward_float32() -> None:
+    model = torch.nn.Conv1d(2, 2, 3, dtype=torch.bfloat16)
+
+    result = align_conv1d_dtype(model, torch.float32)
+
+    assert model.weight.dtype == torch.float32
+    assert model.bias.dtype == torch.float32
+    assert result["dtype"] == "torch.float32"

@@ -177,8 +177,14 @@ def train_grpo(config: dict[str, Any]) -> Path:
         trainable=False,
         pad_token_id=tokenizer.pad_token_id,
     )
-    for name, model in (("policy", policy), ("reward", reward_model)):
-        aligned = align_conv1d_dtype(model, grpo_config)
+    policy_dtype = (
+        torch.bfloat16 if bool(grpo_config.get("bf16")) else torch.float16
+    )
+    for name, model, conv_dtype in (
+        ("policy", policy, policy_dtype),
+        ("reward", reward_model, torch.float32),
+    ):
+        aligned = align_conv1d_dtype(model, conv_dtype)
         LOGGER.info("Aligned %s Conv1d modules for GRPO generation: %s", name, aligned)
 
     output_dir = Path(grpo_config["output_dir"]).resolve()
