@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 
+from amazon_review_alignment.cli import build_parser
 from amazon_review_alignment.config import load_config
 
 
@@ -50,3 +51,12 @@ def test_model_profiles_separate_smoke_and_a100_outputs() -> None:
     assert a100["rlhf"]["ppo_prompt_count"] == 128
     assert a100["rlhf"]["grpo"]["prompt_count"] == 128
     assert smoke["project"]["output_dir"] != a100["project"]["output_dir"]
+
+
+def test_evaluate_cli_accepts_baseline_only() -> None:
+    args = build_parser().parse_args(
+        ["evaluate", "--config", "configs/rlhf_smoke.yaml", "--variants", "base"]
+    )
+
+    assert args.command == "evaluate"
+    assert args.variants == ["base"]

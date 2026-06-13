@@ -83,6 +83,19 @@ Start with `configs/smoke.yaml` to exercise each stage on a small sample.
 Generated datasets, API records, adapters, predictions, metrics, plots, and
 reports are written below `outputs/`.
 
+Generate the untrained Base baseline before any adapter exists:
+
+```powershell
+review-align evaluate --config configs/rlhf_smoke.yaml --variants base
+```
+
+After each stage, compare only the variants already available:
+
+```powershell
+review-align evaluate --config configs/rlhf_smoke.yaml --variants base sft
+review-align evaluate --config configs/rlhf_smoke.yaml --variants base sft dpo
+```
+
 ## A100 Reward Model, PPO, and GRPO extension
 
 The online RL branches require the SFT adapter and validated teacher preferences.

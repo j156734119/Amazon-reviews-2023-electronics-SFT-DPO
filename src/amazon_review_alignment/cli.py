@@ -80,6 +80,12 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Override the config and enable OpenAI pairwise judging.",
     )
+    evaluate.add_argument(
+        "--variants",
+        nargs="+",
+        choices=("base", "sft", "dpo", "ppo", "grpo"),
+        help="Evaluate only these variants, for example: --variants base sft.",
+    )
 
     human = subparsers.add_parser("human-eval")
     _add_common_arguments(human)
@@ -165,6 +171,8 @@ def main(argv: list[str] | None = None) -> None:
 
         if args.llm_judge:
             config["evaluation"]["run_llm_judge"] = True
+        if args.variants:
+            config["evaluation"]["variants"] = args.variants
         command_handlers[args.command] = lambda: run_evaluation(config, args.force_inference)
     elif args.command == "human-eval":
         from .human_eval import prepare_human_evaluation, summarize_human_evaluation
