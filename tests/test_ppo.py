@@ -54,7 +54,10 @@ def test_a100_auxiliary_models_load_in_native_bf16() -> None:
         dtype=torch.bfloat16,
     )
 
-    assert kwargs == {"dtype": torch.bfloat16}
+    assert kwargs == {
+        "dtype": torch.bfloat16,
+        "device_map": "auto",
+    }
     assert "quantization_config" not in kwargs
 
 

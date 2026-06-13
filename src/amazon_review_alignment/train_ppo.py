@@ -33,7 +33,7 @@ def auxiliary_model_loading_kwargs(
         return quantization_kwargs(model_config)
     if dtype is None:
         raise ValueError("A dtype is required for non-quantized auxiliary models.")
-    return {"dtype": dtype}
+    return {"dtype": dtype, "device_map": "auto"}
 
 
 def build_ppo_records(
