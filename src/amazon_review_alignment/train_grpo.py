@@ -9,6 +9,7 @@ from typing import Any
 from .config import output_root
 from .grpo_rewards import evidence_reward, length_reward, schema_reward
 from .modeling import (
+    align_conv1d_dtype,
     load_tokenizer,
     quantization_kwargs,
     render_chat,
@@ -176,6 +177,9 @@ def train_grpo(config: dict[str, Any]) -> Path:
         trainable=False,
         pad_token_id=tokenizer.pad_token_id,
     )
+    for name, model in (("policy", policy), ("reward", reward_model)):
+        aligned = align_conv1d_dtype(model, grpo_config)
+        LOGGER.info("Aligned %s Conv1d modules for GRPO generation: %s", name, aligned)
 
     output_dir = Path(grpo_config["output_dir"]).resolve()
     values = grpo_argument_values(config, output_dir)

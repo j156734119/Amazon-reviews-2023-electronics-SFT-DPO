@@ -48,6 +48,31 @@ def training_precision(training_config: dict[str, Any]) -> dict[str, bool]:
     return {"fp16": fp16, "bf16": bf16}
 
 
+def align_conv1d_dtype(
+    model: Any,
+    training_config: dict[str, Any],
+) -> dict[str, int | str]:
+    import torch
+
+    precision = training_precision(training_config)
+    dtype = torch.bfloat16 if precision["bf16"] else torch.float16
+    modules = 0
+    parameters = 0
+    for module in model.modules():
+        if not isinstance(module, torch.nn.Conv1d):
+            continue
+        modules += 1
+        for parameter in module.parameters(recurse=False):
+            parameters += parameter.numel()
+            if parameter.dtype != dtype:
+                parameter.data = parameter.data.to(dtype)
+    return {
+        "conv1d_modules": modules,
+        "conv1d_parameters": parameters,
+        "dtype": str(dtype),
+    }
+
+
 def validate_model_runtime(model_config: dict[str, Any]) -> None:
     minimum = model_config.get("min_transformers_version")
     if not minimum:

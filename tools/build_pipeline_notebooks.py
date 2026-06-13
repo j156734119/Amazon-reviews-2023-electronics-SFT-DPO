@@ -56,6 +56,27 @@ def common_setup_cells(gpu_name: str, config_path: str) -> list[dict[str, Any]]:
             REPO_DIR.parent.mkdir(parents=True, exist_ok=True)
 
             if (REPO_DIR / ".git").exists():
+                status = subprocess.run(
+                    ["git", "-C", str(REPO_DIR), "status", "--short"],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                ).stdout.strip()
+                if status:
+                    print("Preserving Colab-local tracked changes before pull:")
+                    print(status)
+                    subprocess.run(
+                        [
+                            "git",
+                            "-C",
+                            str(REPO_DIR),
+                            "stash",
+                            "push",
+                            "-m",
+                            "colab-auto-stash-before-pull",
+                        ],
+                        check=True,
+                    )
                 subprocess.run(
                     ["git", "-C", str(REPO_DIR), "pull", "--ff-only"],
                     check=True,
@@ -131,7 +152,36 @@ def common_setup_cells(gpu_name: str, config_path: str) -> list[dict[str, Any]]:
                 "/content/drive/MyDrive/amazon-review-alignment-workspace/repo"
             )
             os.chdir(REPO_DIR)
+            source_dir = str(REPO_DIR / "src")
+            if source_dir not in sys.path:
+                sys.path.insert(0, source_dir)
             CONFIG = "{config_path}"
+
+            try:
+                import amazon_review_alignment
+                import bitsandbytes
+                import peft
+                import transformers
+                import trl
+            except (ImportError, ModuleNotFoundError):
+                subprocess.run(
+                    [
+                        sys.executable,
+                        "-m",
+                        "pip",
+                        "install",
+                        "-q",
+                        "-e",
+                        ".[train,eval,dev]",
+                    ],
+                    cwd=REPO_DIR,
+                    check=True,
+                )
+                import amazon_review_alignment
+                import bitsandbytes
+                import peft
+                import transformers
+                import trl
 
             for secret_name in ("OPENAI_API_KEY", "HF_TOKEN"):
                 try:
@@ -149,9 +199,42 @@ def common_setup_cells(gpu_name: str, config_path: str) -> list[dict[str, Any]]:
                     *arguments,
                 ]
                 print("\\n$", " ".join(command))
-                return subprocess.run(command, cwd=REPO_DIR, check=check, text=True)
+                process = subprocess.Popen(
+                    command,
+                    cwd=REPO_DIR,
+                    text=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    bufsize=1,
+                )
+                output_lines = []
+                assert process.stdout is not None
+                for line in process.stdout:
+                    print(line, end="", flush=True)
+                    output_lines.append(line)
+                returncode = process.wait()
+                result = subprocess.CompletedProcess(
+                    command,
+                    returncode,
+                    stdout="".join(output_lines),
+                    stderr=None,
+                )
+                if check and returncode:
+                    raise RuntimeError(
+                        f"Command failed with exit code {{returncode}}: "
+                        + " ".join(command)
+                    )
+                return result
 
             print("Config:", CONFIG)
+            print("Package:", Path(amazon_review_alignment.__file__).resolve())
+            print(
+                "Training stack:",
+                transformers.__version__,
+                trl.__version__,
+                peft.__version__,
+                bitsandbytes.__version__,
+            )
             print("OpenAI key loaded:", bool(os.getenv("OPENAI_API_KEY")))
             print("HF token loaded:", bool(os.getenv("HF_TOKEN")))
             """
@@ -190,6 +273,108 @@ def environment_cell(expected_gpu: str, minimum_gib: int, require_bf16: bool) ->
     )
 
 
+def a100_run_mode_cells() -> list[dict[str, Any]]:
+    return [
+        markdown(
+            """
+            ## 4. 选择 A100 Mini Smoke 或正式训练
+
+            首次运行保持 `RUN_MODE="mini"`。它使用 Qwen3.5-2B 和真实 A100
+            装配，但只训练一步，并使用 60 条评论验证完整链路。全部通过后改成
+            `RUN_MODE="formal"`，重新从数据准备开始执行正式实验。
+
+            Mini 与正式输出目录完全隔离，不会相互复用 checkpoint。
+            """
+        ),
+        code(
+            """
+            import yaml
+
+            from amazon_review_alignment.config import load_config
+
+            RUN_MODE = "mini"  # mini | formal
+
+            if RUN_MODE == "mini":
+                merged = load_config(REPO_DIR / "configs" / "rlhf_a100.yaml")
+                merged.pop("_config_path", None)
+
+                old_root = "outputs/a100-qwen3.5-2b"
+                new_root = "outputs/a100-mini-qwen3.5-2b"
+
+                def replace_output_paths(value):
+                    if isinstance(value, dict):
+                        return {
+                            key: replace_output_paths(item)
+                            for key, item in value.items()
+                        }
+                    if isinstance(value, list):
+                        return [replace_output_paths(item) for item in value]
+                    if isinstance(value, str):
+                        return value.replace(old_root, new_root)
+                    return value
+
+                merged = replace_output_paths(merged)
+                merged["project"]["output_dir"] = new_root
+                merged["data"].update(
+                    {
+                        "sample_size": 60,
+                        "max_scanned_reviews": 20000,
+                        "rating_targets": {
+                            "1": 12,
+                            "2": 12,
+                            "3": 12,
+                            "4": 12,
+                            "5": 12,
+                        },
+                        "splits": {
+                            "train": 42,
+                            "validation": 6,
+                            "test": 12,
+                        },
+                    }
+                )
+                merged["teacher"].update(
+                    {
+                        "pilot_size": 5,
+                        "max_estimated_cost_usd": 1.0,
+                    }
+                )
+                merged["training"]["sft"]["max_steps"] = 1
+                merged["training"]["dpo"]["max_steps"] = 1
+                merged["rlhf"].update(
+                    {
+                        "human_calibration_samples": 0,
+                        "ai_reward_train_pairs": 4,
+                        "ai_reward_validation_pairs": 2,
+                        "ppo_prompt_count": 4,
+                    }
+                )
+                merged["rlhf"]["reward"]["max_steps"] = 1
+                merged["rlhf"]["ppo"]["total_episodes"] = 4
+                merged["rlhf"]["ppo"]["gradient_accumulation_steps"] = 1
+                merged["rlhf"]["ppo"]["save_steps"] = 1
+                merged["rlhf"]["grpo"]["prompt_count"] = 4
+                merged["rlhf"]["grpo"]["max_steps"] = 1
+                merged["evaluation"]["max_test_samples"] = 4
+
+                mini_path = Path("/content/rlhf_a100_mini.yaml")
+                mini_path.write_text(
+                    yaml.safe_dump(merged, sort_keys=False),
+                    encoding="utf-8",
+                )
+                CONFIG = str(mini_path)
+            elif RUN_MODE == "formal":
+                CONFIG = "configs/rlhf_a100.yaml"
+            else:
+                raise ValueError("RUN_MODE must be 'mini' or 'formal'.")
+
+            print("Run mode:", RUN_MODE)
+            print("Effective config:", CONFIG)
+            """
+        ),
+    ]
+
+
 def test_data_baseline_cells() -> list[dict[str, Any]]:
     return [
         markdown("## 4. 测试、准备数据并生成 Base baseline"),
@@ -215,11 +400,10 @@ def test_data_baseline_cells() -> list[dict[str, Any]]:
             )
 
             import pandas as pd
+            from amazon_review_alignment.config import load_config
 
-            output_root = (
-                Path("outputs/smoke")
-                if "smoke" in CONFIG
-                else Path("outputs/a100-qwen3.5-2b")
+            output_root = Path(
+                load_config(CONFIG)["project"]["output_dir"]
             )
             display(pd.read_csv(output_root / "evaluation" / "metrics.csv"))
             """
@@ -252,11 +436,9 @@ def teacher_cells() -> list[dict[str, Any]]:
         ),
         code(
             """
-            output_root = (
-                Path("outputs/smoke")
-                if "smoke" in CONFIG
-                else Path("outputs/a100-qwen3.5-2b")
-            )
+            from amazon_review_alignment.config import load_config
+
+            output_root = Path(load_config(CONFIG)["project"]["output_dir"])
             train_preferences = output_root / "teacher" / "preferences_train.jsonl"
             validation_preferences = (
                 output_root / "teacher" / "preferences_validation.jsonl"
@@ -473,6 +655,7 @@ def build_a100() -> dict[str, Any]:
         *common_setup_cells("A100", "configs/rlhf_a100.yaml"),
         markdown("## A100 环境检查"),
         environment_cell("A100", 38, True),
+        *a100_run_mode_cells(),
         *test_data_baseline_cells(),
         *teacher_cells(),
         *sft_dpo_cells(),

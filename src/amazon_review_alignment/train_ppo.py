@@ -8,6 +8,7 @@ from typing import Any
 
 from .config import output_root
 from .modeling import (
+    align_conv1d_dtype,
     load_tokenizer,
     quantization_kwargs,
     render_chat,
@@ -166,6 +167,13 @@ def train_ppo(config: dict[str, Any]) -> Path:
         trainable=True,
         pad_token_id=tokenizer.pad_token_id,
     )
+    for name, model in (
+        ("policy", policy),
+        ("reward", reward_model),
+        ("value", value_model),
+    ):
+        aligned = align_conv1d_dtype(model, ppo_config)
+        LOGGER.info("Aligned %s Conv1d modules for PPO generation: %s", name, aligned)
 
     output_dir = Path(ppo_config["output_dir"]).resolve()
     values = {
