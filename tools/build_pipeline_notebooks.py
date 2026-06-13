@@ -306,12 +306,12 @@ def smoke_human_cells() -> list[dict[str, Any]]:
             """
             ## 7. Smoke 人工偏好校准
 
-            对 8 组回答逐条输入 `A`、`B` 或 `tie`。至少保留两条非 tie 记录。
+            对 4 组回答逐条输入 `A`、`B` 或 `tie`。至少保留两条非 tie 记录。
             """
         ),
         code(
             """
-            cli("prepare-rm-human-eval", "--config", CONFIG, "--samples", "8")
+            cli("prepare-rm-human-eval", "--config", CONFIG, "--samples", "4")
 
             import pandas as pd
 
@@ -347,50 +347,30 @@ def smoke_human_cells() -> list[dict[str, Any]]:
     ]
 
 
-def a100_human_cells() -> list[dict[str, Any]]:
+def a100_rlaif_cells() -> list[dict[str, Any]]:
     return [
         markdown(
             """
-            ## 7. A100 正式人工偏好校准
+            ## 7. 构建纯 RLAIF 数据
 
-            生成 200 条盲评 CSV。下载后填写 `choice` 列，只允许 `A`、`B`、`tie`，
-            再上传回原路径。不要查看 `rm_human_key.jsonl`。
+            A100 正式流程不要求人工填写 200 条 A/B。Reward Model、PPO 和 GRPO
+            直接使用 OpenAI 教师生成并通过规则校验的 chosen/rejected 偏好。
+
+            这属于 RLAIF，而不是纯 RLHF。独立的 200 条人工盲评仅用于最终评估，
+            不进入训练数据。
             """
         ),
         code(
             """
-            cli("prepare-rm-human-eval", "--config", CONFIG, "--samples", "200")
+            cli("build-rlhf-data", "--config", CONFIG)
 
-            from google.colab import files
+            import json
 
-            responses_path = output_root / "rlhf" / "rm_human_responses.csv"
-            print("Fill the choice column, then upload the completed CSV.")
-            files.download(str(responses_path))
-            """
-        ),
-        code(
-            """
-            import shutil
-
-            from google.colab import files
-
-            uploaded = files.upload()
-            if len(uploaded) != 1:
-                raise ValueError("Upload exactly one completed CSV.")
-            uploaded_name = next(iter(uploaded))
-            shutil.copyfile(uploaded_name, responses_path)
-            print("Restored:", responses_path)
-            """
-        ),
-        code(
-            """
-            cli(
-                "build-rlhf-data",
-                "--config",
-                CONFIG,
-                "--responses",
-                str(responses_path),
-            )
+            manifest_path = output_root / "rlhf" / "data_manifest.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            print(json.dumps(manifest, indent=2))
+            assert manifest["alignment_method"] == "rlaif"
+            assert manifest["human_total_rows"] == 0
             """
         ),
     ]
@@ -496,7 +476,7 @@ def build_a100() -> dict[str, Any]:
         *test_data_baseline_cells(),
         *teacher_cells(),
         *sft_dpo_cells(),
-        *a100_human_cells(),
+        *a100_rlaif_cells(),
         *online_training_cells(),
     ]
     return notebook(cells, "A100")

@@ -1,7 +1,7 @@
 extends: full.yaml
 
 rlhf:
-  human_calibration_samples: 200
+  human_calibration_samples: 0
   human_train_fraction: 0.8
   ai_reward_train_pairs: 800
   ai_reward_validation_pairs: 500

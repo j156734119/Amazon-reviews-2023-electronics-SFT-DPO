@@ -162,7 +162,7 @@ def _assert_disjoint(named_ids: dict[str, set[str]]) -> None:
 
 def build_rlhf_data(
     config: dict[str, Any],
-    responses_path: str | Path,
+    responses_path: str | Path | None = None,
 ) -> dict[str, Any]:
     seed = int(config["project"]["seed"])
     rng = random.Random(seed)
@@ -175,19 +175,33 @@ def build_rlhf_data(
     if not train_preferences or not validation_preferences:
         raise RuntimeError("Teacher preference data is missing.")
 
-    source_by_id = {str(row["id"]): row for row in train_preferences}
-    human_pairs, ties = _load_human_preferences(
-        config,
-        responses_path,
-        source_by_id,
-    )
-    if len(human_pairs) < 2:
-        raise ValueError("At least two non-tie human preferences are required.")
-    rng.shuffle(human_pairs)
-    train_fraction = float(config["rlhf"]["human_train_fraction"])
-    split_index = max(1, min(len(human_pairs) - 1, round(len(human_pairs) * train_fraction)))
-    human_train = human_pairs[:split_index]
-    human_eval = human_pairs[split_index:]
+    human_requested = int(config["rlhf"].get("human_calibration_samples", 0))
+    if human_requested:
+        if responses_path is None:
+            raise ValueError(
+                "--responses is required when human_calibration_samples is greater than zero."
+            )
+        source_by_id = {str(row["id"]): row for row in train_preferences}
+        human_pairs, ties = _load_human_preferences(
+            config,
+            responses_path,
+            source_by_id,
+        )
+        if len(human_pairs) < 2:
+            raise ValueError("At least two non-tie human preferences are required.")
+        rng.shuffle(human_pairs)
+        train_fraction = float(config["rlhf"]["human_train_fraction"])
+        split_index = max(
+            1,
+            min(len(human_pairs) - 1, round(len(human_pairs) * train_fraction)),
+        )
+        human_train = human_pairs[:split_index]
+        human_eval = human_pairs[split_index:]
+    else:
+        human_pairs = []
+        human_train = []
+        human_eval = []
+        ties = 0
 
     human_ids = {row["id"] for row in human_pairs}
     ai_candidates = [
@@ -255,6 +269,14 @@ def build_rlhf_data(
     write_jsonl(directory / "ppo_prompts.jsonl", ppo_prompts)
     write_jsonl(directory / "grpo_prompts.jsonl", ppo_prompts)
     manifest = {
+        "alignment_method": (
+            "human_calibrated_rlaif" if human_requested else "rlaif"
+        ),
+        "preference_source": (
+            "ai_teacher_with_human_calibration"
+            if human_requested
+            else "ai_teacher"
+        ),
         "human_total_rows": len(human_pairs) + ties,
         "human_non_tie_rows": len(human_pairs),
         "human_ties_dropped": ties,

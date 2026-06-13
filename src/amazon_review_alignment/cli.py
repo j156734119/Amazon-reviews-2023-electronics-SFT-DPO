@@ -49,7 +49,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     rlhf_data = subparsers.add_parser("build-rlhf-data")
     _add_common_arguments(rlhf_data)
-    rlhf_data.add_argument("--responses", type=Path, required=True)
+    rlhf_data.add_argument(
+        "--responses",
+        type=Path,
+        help="Completed A/B/tie CSV; omit when human_calibration_samples is zero.",
+    )
 
     merge = subparsers.add_parser("merge-sft")
     _add_common_arguments(merge)

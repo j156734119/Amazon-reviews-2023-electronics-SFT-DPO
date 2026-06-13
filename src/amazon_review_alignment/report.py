@@ -68,6 +68,9 @@ def build_report(config: dict[str, Any]) -> Path:
     reward = _read_json_if_exists(root / "rlhf" / "reward_metrics.json")
     ppo = _read_json_if_exists(root / "rlhf" / "ppo_metrics.json")
     grpo = _read_json_if_exists(root / "rlhf" / "grpo_metrics.json")
+    human_calibration_samples = int(
+        config.get("rlhf", {}).get("human_calibration_samples", 0)
+    )
 
     lines = [
         "# Amazon Review Alignment Results",
@@ -211,9 +214,12 @@ def build_report(config: dict[str, Any]) -> Path:
                 "not be reframed as success."
             ),
             (
-                "- PPO uses predominantly AI-generated preferences with a small "
-                "human calibration subset, so it is reported as human-calibrated "
-                "RLAIF rather than pure RLHF."
+                "- PPO and GRPO use AI-generated preferences, so they are reported "
+                "as RLAIF rather than RLHF."
+                if human_calibration_samples == 0
+                else "- PPO and GRPO use AI-generated preferences with a small "
+                "human calibration subset, so they are reported as "
+                "human-calibrated RLAIF rather than pure RLHF."
             ),
             (
                 "- The PPO policy receives only 256 episodes in the T4 configuration; "
