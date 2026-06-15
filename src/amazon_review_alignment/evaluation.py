@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
@@ -18,6 +19,10 @@ from .schemas import JudgeChoice, JudgeDecision, parse_analysis
 from .utils import normalized_match, read_jsonl, save_run_metadata, write_json, write_jsonl
 
 LOGGER = logging.getLogger(__name__)
+
+
+def _response_hash(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
 def evaluate_output(raw_output: str, review_text: str) -> dict[str, Any]:
@@ -125,7 +130,12 @@ def run_llm_judge(
         else []
     )
     existing = {
-        (row.get("comparison"), str(row.get("id"))): row
+        (
+            row.get("comparison"),
+            str(row.get("id")),
+            row.get("response_a_sha256"),
+            row.get("response_b_sha256"),
+        ): row
         for row in existing_rows
         if row.get("judge_model") == judge_model
     }
@@ -137,7 +147,23 @@ def run_llm_judge(
         selected_ids = common_ids[:pair_limit]
         for index, review_id in enumerate(selected_ids, start=1):
             comparison = f"{left}_vs_{right}"
-            existing_decision = existing.get((comparison, str(review_id)))
+            left_row = by_variant[left][review_id]
+            right_row = by_variant[right][review_id]
+            swapped = bool(rng.getrandbits(1))
+            if swapped:
+                shown = [(right, right_row["raw_output"]), (left, left_row["raw_output"])]
+            else:
+                shown = [(left, left_row["raw_output"]), (right, right_row["raw_output"])]
+            response_a_hash = _response_hash(str(shown[0][1]))
+            response_b_hash = _response_hash(str(shown[1][1]))
+            existing_decision = existing.get(
+                (
+                    comparison,
+                    str(review_id),
+                    response_a_hash,
+                    response_b_hash,
+                )
+            )
             if existing_decision is not None:
                 decisions.append(existing_decision)
                 if index % 10 == 0 or index == len(selected_ids):
@@ -148,13 +174,6 @@ def run_llm_judge(
                         len(selected_ids),
                     )
                 continue
-            left_row = by_variant[left][review_id]
-            right_row = by_variant[right][review_id]
-            swapped = bool(rng.getrandbits(1))
-            if swapped:
-                shown = [(right, right_row["raw_output"]), (left, left_row["raw_output"])]
-            else:
-                shown = [(left, left_row["raw_output"]), (right, right_row["raw_output"])]
             decision = _judge_pair(
                 client,
                 judge_model,
@@ -178,6 +197,8 @@ def run_llm_judge(
                 "winner": winner or "tie",
                 "reason": decision.reason,
                 "judge_model": judge_model,
+                "response_a_sha256": response_a_hash,
+                "response_b_sha256": response_b_hash,
             }
             decisions.append(row)
             if resume_path is not None:

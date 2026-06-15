@@ -1,0 +1,6 @@
+variant,examples,mean_output_words,parsed_json_outputs,negative_outputs,neutral_outputs,positive_outputs
+base,500,57.62,490,236,91,153
+sft,500,43.16,500,289,8,203
+dpo,500,50.83,425,267,21,137
+ppo,500,44.53,500,288,7,205
+grpo,500,44.63,500,287,7,206

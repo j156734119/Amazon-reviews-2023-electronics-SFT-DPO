@@ -57,6 +57,18 @@ def test_model_profiles_separate_smoke_and_a100_outputs() -> None:
     assert smoke["project"]["output_dir"] != a100["project"]["output_dir"]
 
 
+def test_expanded_online_profile_uses_shared_1024_prompt_budget() -> None:
+    root = Path(__file__).resolve().parents[1]
+    config = load_config(root / "configs" / "rlhf_a100_online_v2.yaml")
+
+    assert config["rlhf"]["ppo_prompt_count"] == 1024
+    assert config["rlhf"]["ppo"]["total_episodes"] == 1024
+    assert config["rlhf"]["grpo"]["prompt_count"] == 1024
+    assert config["rlhf"]["ppo"]["output_dir"].endswith("models/ppo-v2")
+    assert config["rlhf"]["grpo"]["output_dir"].endswith("models/grpo-v2")
+    assert len(config["evaluation"]["judge_pairs"]) == 10
+
+
 def test_evaluate_cli_accepts_baseline_only() -> None:
     args = build_parser().parse_args(
         ["evaluate", "--config", "configs/rlhf_smoke.yaml", "--variants", "base"]

@@ -20,6 +20,13 @@ def _preference(index: int, split: str = "train") -> dict:
     }
 
 
+def _raw_train(index: int) -> dict:
+    return {
+        "id": f"raw-{index}",
+        "text": f"Raw training review {index}.",
+    }
+
+
 def _config(tmp_path: Path) -> dict:
     return {
         "project": {"seed": 42, "output_dir": str(tmp_path)},
@@ -43,6 +50,10 @@ def test_human_calibration_builds_disjoint_rlhf_data(tmp_path: Path) -> None:
     write_jsonl(
         teacher_dir / "preferences_validation.jsonl",
         [_preference(index, "validation") for index in range(4)],
+    )
+    write_jsonl(
+        data_dir / "train.jsonl",
+        [_raw_train(index) for index in range(12)],
     )
     write_jsonl(
         data_dir / "test.jsonl",
@@ -72,8 +83,10 @@ def test_human_calibration_builds_disjoint_rlhf_data(tmp_path: Path) -> None:
     assert not ids[0] & ids[1]
     assert not ids[0] & ids[2]
     assert not ids[1] & ids[2]
+    assert all(row["source"] == "raw_train_prompt_excluded_from_reward_model" for row in ppo)
     assert [row["id"] for row in ppo] == [row["id"] for row in grpo]
     assert manifest["ppo_grpo_shared_prompt_ids"] is True
+    assert manifest["online_prompt_source"] == "raw_train_excluded_from_reward_model"
 
 
 def test_human_choice_controls_preference_direction(tmp_path: Path) -> None:
@@ -86,6 +99,10 @@ def test_human_choice_controls_preference_direction(tmp_path: Path) -> None:
     write_jsonl(
         teacher_dir / "preferences_validation.jsonl",
         [_preference(index, "validation") for index in range(3)],
+    )
+    write_jsonl(
+        data_dir / "train.jsonl",
+        [_raw_train(index) for index in range(12)],
     )
     write_jsonl(data_dir / "test.jsonl", [{"id": "test-1", "text": "held out"}])
     config = _config(tmp_path)
@@ -120,6 +137,10 @@ def test_pure_rlaif_builds_without_human_response_file(tmp_path: Path) -> None:
     write_jsonl(
         teacher_dir / "preferences_validation.jsonl",
         [_preference(index, "validation") for index in range(3)],
+    )
+    write_jsonl(
+        data_dir / "train.jsonl",
+        [_raw_train(index) for index in range(12)],
     )
     write_jsonl(data_dir / "test.jsonl", [{"id": "test-1", "text": "held out"}])
     config = _config(tmp_path)

@@ -1,0 +1,37 @@
+extends: rlhf_a100_dpo_v2.yaml
+
+rlhf:
+  ppo_prompt_count: 1024
+  ppo:
+    output_dir: outputs/a100-qwen3.5-2b/models/ppo-v2
+    total_episodes: 1024
+    learning_rate: 0.000005
+    temperature: 0.9
+    kl_coef: 0.02
+    save_steps: 64
+  grpo:
+    output_dir: outputs/a100-qwen3.5-2b/models/grpo-v2
+    prompt_count: 1024
+    learning_rate: 0.000005
+    temperature: 0.9
+    beta: 0.01
+    save_steps: 64
+    reward_weights:
+      reward_model: 2.0
+      schema: 0.25
+      evidence: 0.5
+      length: 0.1
+
+evaluation:
+  judge_samples_per_pair: 100
+  judge_pairs:
+    - [base, sft]
+    - [base, dpo]
+    - [base, ppo]
+    - [base, grpo]
+    - [sft, dpo]
+    - [sft, ppo]
+    - [sft, grpo]
+    - [dpo, ppo]
+    - [dpo, grpo]
+    - [ppo, grpo]

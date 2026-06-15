@@ -1,0 +1,12 @@
+{
+  "ai_validation": {
+    "examples": 130,
+    "preference_accuracy": 0.9,
+    "mean_reward_margin": 2.3178386981670673
+  },
+  "human_held_out": {
+    "examples": 0,
+    "preference_accuracy": 0.0,
+    "mean_reward_margin": 0.0
+  }
+}

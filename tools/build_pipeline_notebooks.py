@@ -675,6 +675,183 @@ def online_training_cells(include_ai_judge: bool = False) -> list[dict[str, Any]
     return cells
 
 
+def expanded_online_experiment_cells() -> list[dict[str, Any]]:
+    return [
+        markdown(
+            """
+            ## 11. 扩展 PPO/GRPO v2 实验
+
+            原实验的 128 个 prompt 是资源受限 feasibility baseline，并非 5,000
+            条评论全部进入在线 RL。5,000 条原始评论被切分为 3,500 train、500
+            validation 和 1,000 test；PPO/GRPO 只能使用 train，且必须避开 Reward
+            Model 训练样本和 test。
+
+            v2 从原始 train 中抽取 1,024 个与 RM 严格不重叠的共享 prompt，是原
+            baseline 的 8 倍。PPO/GRPO 均从相同 SFT policy、Reward Model 和 prompt
+            IDs 开始，分别保存到 `ppo-v2`、`grpo-v2`，不覆盖旧 adapter。
+
+            预计 A100 40GB 总耗时约 10–14 小时。每个训练阶段是独立单元，完成后
+            checkpoint 和 adapter 都会保存在 Drive。
+            """
+        ),
+        code(
+            """
+            from pathlib import Path
+            import json
+            import shutil
+
+            from amazon_review_alignment.config import load_config
+
+            ONLINE_V2_CONFIG = "configs/rlhf_a100_online_v2.yaml"
+            online_v2 = load_config(REPO_DIR / ONLINE_V2_CONFIG)
+            online_root = Path(online_v2["project"]["output_dir"]).resolve()
+            archive_dir = online_root / "archive" / "online-v1"
+            archive_dir.mkdir(parents=True, exist_ok=True)
+
+            files_to_archive = [
+                "rlhf/data_manifest.json",
+                "rlhf/ppo_prompts.jsonl",
+                "rlhf/grpo_prompts.jsonl",
+                "rlhf/ppo_metrics.json",
+                "rlhf/grpo_metrics.json",
+                "rlhf/ppo_log_history.json",
+                "rlhf/grpo_log_history.json",
+                "evaluation/metrics.csv",
+                "evaluation/evaluation_summary.json",
+                "evaluation/report.md",
+                "evaluation/judge_decisions.jsonl",
+                "evaluation/judge_pairwise_summary.csv",
+                "evaluation/predictions/ppo.jsonl",
+                "evaluation/predictions/grpo.jsonl",
+            ]
+            for relative in files_to_archive:
+                source = online_root / relative
+                target = archive_dir / relative
+                if source.exists() and not target.exists():
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(source, target)
+
+            cli("build-rlhf-data", "--config", ONLINE_V2_CONFIG)
+
+            manifest_path = online_root / "rlhf" / "data_manifest.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            assert manifest["ppo_prompts"] == 1024
+            assert manifest["grpo_prompts"] == 1024
+            assert manifest["ppo_grpo_shared_prompt_ids"] is True
+            assert (
+                manifest["online_prompt_source"]
+                == "raw_train_excluded_from_reward_model"
+            )
+            print(json.dumps(manifest, indent=2))
+            print("Archived v1 artifacts:", archive_dir.resolve())
+            """
+        ),
+        markdown(
+            """
+            ### 11.1 PPO v2
+
+            训练 1,024 episodes，温度提高到 0.9 增加探索，KL 系数从 0.05
+            降至 0.02，避免策略被过强地固定在 SFT 附近。
+            """
+        ),
+        code('cli("train-ppo", "--config", ONLINE_V2_CONFIG)'),
+        markdown(
+            """
+            ### 11.2 GRPO v2
+
+            使用同一批 1,024 prompts，每条生成 4 个候选，共约 4,096 个
+            completions。提高 RM 权重并降低已饱和规则奖励权重，`beta=0.01`
+            允许比 v1 更充分的策略更新。
+            """
+        ),
+        code('cli("train-grpo", "--config", ONLINE_V2_CONFIG)'),
+        markdown("### 11.3 v2 推理与硬指标"),
+        code(
+            """
+            cli(
+                "inference",
+                "--config",
+                ONLINE_V2_CONFIG,
+                "--variant",
+                "ppo",
+                "--force",
+            )
+            cli(
+                "inference",
+                "--config",
+                ONLINE_V2_CONFIG,
+                "--variant",
+                "grpo",
+                "--force",
+            )
+
+            prediction_dir = online_root / "evaluation" / "predictions"
+            shutil.copy2(
+                prediction_dir / "ppo.jsonl",
+                prediction_dir / "ppo-v2.jsonl",
+            )
+            shutil.copy2(
+                prediction_dir / "grpo.jsonl",
+                prediction_dir / "grpo-v2.jsonl",
+            )
+
+            cli(
+                "evaluate",
+                "--config",
+                ONLINE_V2_CONFIG,
+                "--variants",
+                "base",
+                "sft",
+                "dpo",
+                "ppo",
+                "grpo",
+            )
+            display(pd.read_csv(online_root / "evaluation" / "metrics.csv"))
+            """
+        ),
+        markdown(
+            """
+            ### 11.4 五模型全两两 AI 盲评
+
+            对 Base、SFT、DPO、PPO v2、GRPO v2 的 10 种组合各抽取 100 条，
+            共 1,000 次匿名 A/B/tie 判断。若中断，响应哈希会确保只继续缺失或
+            已改变的模型回答，不会把 v1 的 PPO/GRPO 判断误用于 v2。
+            """
+        ),
+        code(
+            """
+            cli(
+                "evaluate",
+                "--config",
+                ONLINE_V2_CONFIG,
+                "--variants",
+                "base",
+                "sft",
+                "dpo",
+                "ppo",
+                "grpo",
+                "--llm-judge",
+                "--judge-samples-per-pair",
+                "100",
+            )
+            cli("build-report", "--config", ONLINE_V2_CONFIG)
+
+            judge_path = (
+                online_root
+                / "evaluation"
+                / "judge_pairwise_summary.csv"
+            )
+            print("===== ONLINE V2 AI BLIND JUDGE =====")
+            display(pd.read_csv(judge_path))
+            print(
+                "Report:",
+                (online_root / "evaluation" / "report.md").resolve(),
+            )
+            """
+        ),
+    ]
+
+
 def notebook(cells: list[dict[str, Any]], gpu_type: str) -> dict[str, Any]:
     for index, cell in enumerate(cells):
         cell["id"] = f"cell-{index:02d}"
@@ -740,6 +917,7 @@ def build_a100() -> dict[str, Any]:
         *sft_dpo_cells(),
         *a100_rlaif_cells(),
         *online_training_cells(include_ai_judge=True),
+        *expanded_online_experiment_cells(),
     ]
     return notebook(cells, "A100")
 
@@ -751,6 +929,23 @@ def write_notebook(path: Path, value: dict[str, Any]) -> None:
     )
 
 
+def append_expanded_cells(path: Path) -> None:
+    if not path.exists():
+        return
+    value = json.loads(path.read_text(encoding="utf-8"))
+    marker = "## 11. 扩展 PPO/GRPO v2 实验"
+    if any(marker in "".join(cell.get("source", [])) for cell in value["cells"]):
+        print(f"{path} already contains expanded online-RL cells")
+        return
+    cells = expanded_online_experiment_cells()
+    start = len(value["cells"])
+    for index, cell in enumerate(cells, start=start):
+        cell["id"] = f"online-v2-{index:02d}"
+    value["cells"].extend(cells)
+    write_notebook(path, value)
+    print(path)
+
+
 def main() -> None:
     root = Path(__file__).resolve().parents[1]
     outputs = {
@@ -760,6 +955,7 @@ def main() -> None:
     for path, value in outputs.items():
         write_notebook(path, value)
         print(path)
+    append_expanded_cells(root / "Amazon_Review_Alignment_A100—1.ipynb")
 
 
 if __name__ == "__main__":

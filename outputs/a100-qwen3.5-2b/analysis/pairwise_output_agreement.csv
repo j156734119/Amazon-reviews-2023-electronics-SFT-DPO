@@ -1,0 +1,11 @@
+comparison,examples,exact_output_match_rate,same_sentiment_rate,sentiment_comparable_examples
+base_vs_sft,500,0.0,0.8081632653061225,490
+base_vs_dpo,500,0.0,0.8177458033573142,417
+base_vs_ppo,500,0.0,0.8061224489795918,490
+base_vs_grpo,500,0.0,0.8061224489795918,490
+sft_vs_dpo,500,0.004,0.9270588235294117,425
+sft_vs_ppo,500,0.08,0.996,500
+sft_vs_grpo,500,0.088,0.994,500
+dpo_vs_ppo,500,0.008,0.9223529411764706,425
+dpo_vs_grpo,500,0.006,0.92,425
+ppo_vs_grpo,500,0.664,0.998,500

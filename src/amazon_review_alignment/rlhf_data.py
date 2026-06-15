@@ -171,9 +171,10 @@ def build_rlhf_data(
     validation_preferences = read_jsonl(
         root / "teacher" / "preferences_validation.jsonl"
     )
+    train_rows = read_jsonl(root / "data" / "train.jsonl")
     test_rows = read_jsonl(root / "data" / "test.jsonl")
-    if not train_preferences or not validation_preferences:
-        raise RuntimeError("Teacher preference data is missing.")
+    if not train_preferences or not validation_preferences or not train_rows:
+        raise RuntimeError("Teacher preferences or raw training data are missing.")
 
     human_requested = int(config["rlhf"].get("human_calibration_samples", 0))
     if human_requested:
@@ -218,14 +219,24 @@ def build_rlhf_data(
             "PPO and GRPO prompt counts must match for the controlled comparison: "
             f"{ppo_count} != {grpo_count}."
         )
-    if len(ai_candidates) < ai_count + ppo_count:
+    if len(ai_candidates) < ai_count:
         raise ValueError(
-            "Not enough unused training preferences for Reward Model and PPO data: "
-            f"need {ai_count + ppo_count}, have {len(ai_candidates)}."
+            "Not enough unused training preferences for Reward Model data: "
+            f"need {ai_count}, have {len(ai_candidates)}."
         )
 
     ai_train_raw = ai_candidates[:ai_count]
-    ppo_raw = ai_candidates[ai_count : ai_count + ppo_count]
+    reserved_reward_ids = human_ids | {str(row["id"]) for row in ai_train_raw}
+    online_candidates = [
+        row for row in train_rows if str(row["id"]) not in reserved_reward_ids
+    ]
+    rng.shuffle(online_candidates)
+    if len(online_candidates) < ppo_count:
+        raise ValueError(
+            "Not enough raw training reviews for the shared PPO/GRPO prompt pool: "
+            f"need {ppo_count}, have {len(online_candidates)} after RM exclusions."
+        )
+    ppo_raw = online_candidates[:ppo_count]
     validation_count = min(
         int(config["rlhf"]["ai_reward_validation_pairs"]),
         len(validation_preferences),
@@ -246,8 +257,7 @@ def build_rlhf_data(
         {
             "id": row["id"],
             "text": row["text"],
-            "prompt": row["prompt"],
-            "source": "unused_teacher_train_prompt",
+            "source": "raw_train_prompt_excluded_from_reward_model",
         }
         for row in ppo_raw
     ]
@@ -288,6 +298,7 @@ def build_rlhf_data(
         "ppo_prompts": len(ppo_prompts),
         "grpo_prompts": len(ppo_prompts),
         "ppo_grpo_shared_prompt_ids": True,
+        "online_prompt_source": "raw_train_excluded_from_reward_model",
         "test_rows_excluded": len(test_rows),
         "seed": seed,
     }

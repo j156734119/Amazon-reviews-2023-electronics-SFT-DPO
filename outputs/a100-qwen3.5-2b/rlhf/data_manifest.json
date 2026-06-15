@@ -1,0 +1,17 @@
+{
+  "alignment_method": "rlaif",
+  "preference_source": "ai_teacher",
+  "human_total_rows": 0,
+  "human_non_tie_rows": 0,
+  "human_ties_dropped": 0,
+  "human_train_pairs": 0,
+  "human_eval_pairs": 0,
+  "ai_reward_train_pairs": 800,
+  "ai_reward_validation_pairs": 130,
+  "reward_train_pairs_total": 800,
+  "ppo_prompts": 128,
+  "grpo_prompts": 128,
+  "ppo_grpo_shared_prompt_ids": true,
+  "test_rows_excluded": 1000,
+  "seed": 42
+}

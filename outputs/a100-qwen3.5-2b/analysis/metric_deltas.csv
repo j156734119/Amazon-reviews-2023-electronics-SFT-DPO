@@ -1,0 +1,9 @@
+reference,variant,schema_valid_rate_delta_pp,evidence_grounded_rate_delta_pp,word_limit_ok_rate_delta_pp,instruction_following_rate_delta_pp
+base,sft,4.6,11.8,4.6,11.8
+base,dpo,-10.8,-4.2,-10.8,-4.2
+base,ppo,4.6,11.2,4.6,11.2
+base,grpo,4.6,10.8,4.6,10.8
+sft,base,-4.6,-11.8,-4.6,-11.8
+sft,dpo,-15.4,-16.0,-15.4,-16.0
+sft,ppo,0.0,-0.6,0.0,-0.6
+sft,grpo,0.0,-1.0,0.0,-1.0

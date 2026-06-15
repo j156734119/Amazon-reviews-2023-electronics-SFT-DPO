@@ -1,0 +1,8 @@
+comparison,examples,left_model,right_model,right_model_win_rate_ties_half,ci_95_low,ci_95_high,ties
+base_vs_sft,50,base,sft,0.57,0.44,0.7,3
+sft_vs_dpo,50,sft,dpo,0.75,0.64,0.85,7
+sft_vs_ppo,50,sft,ppo,0.41,0.31,0.52,19
+sft_vs_grpo,50,sft,grpo,0.48,0.37,0.59,20
+dpo_vs_ppo,50,dpo,ppo,0.36,0.25,0.48,10
+dpo_vs_grpo,50,dpo,grpo,0.4,0.28,0.52,12
+ppo_vs_grpo,50,ppo,grpo,0.46,0.41,0.5,44

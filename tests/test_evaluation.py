@@ -99,3 +99,11 @@ def test_llm_judge_resumes_completed_blind_decisions(tmp_path, monkeypatch) -> N
     assert len(second) == 2
     assert len(calls) == 2
     assert all(row["judge_model"] == "judge-test" for row in second)
+    assert all(row["response_a_sha256"] for row in second)
+    assert all(row["response_b_sha256"] for row in second)
+
+    predictions["sft"][0]["raw_output"] = "changed response"
+    third = run_llm_judge(config, predictions, resume_path=checkpoint)
+
+    assert len(third) == 2
+    assert len(calls) == 3

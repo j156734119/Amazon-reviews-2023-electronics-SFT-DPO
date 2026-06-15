@@ -1,0 +1,44 @@
+{
+  "local_metrics": [
+    {
+      "variant": "base",
+      "examples": 500,
+      "schema_valid_rate": 0.954,
+      "evidence_grounded_rate": 0.842,
+      "word_limit_ok_rate": 0.954,
+      "instruction_following_rate": 0.842
+    },
+    {
+      "variant": "sft",
+      "examples": 500,
+      "schema_valid_rate": 1.0,
+      "evidence_grounded_rate": 0.96,
+      "word_limit_ok_rate": 1.0,
+      "instruction_following_rate": 0.96
+    },
+    {
+      "variant": "dpo",
+      "examples": 500,
+      "schema_valid_rate": 0.846,
+      "evidence_grounded_rate": 0.8,
+      "word_limit_ok_rate": 0.846,
+      "instruction_following_rate": 0.8
+    },
+    {
+      "variant": "ppo",
+      "examples": 500,
+      "schema_valid_rate": 1.0,
+      "evidence_grounded_rate": 0.954,
+      "word_limit_ok_rate": 1.0,
+      "instruction_following_rate": 0.954
+    },
+    {
+      "variant": "grpo",
+      "examples": 500,
+      "schema_valid_rate": 1.0,
+      "evidence_grounded_rate": 0.95,
+      "word_limit_ok_rate": 1.0,
+      "instruction_following_rate": 0.95
+    }
+  ]
+}

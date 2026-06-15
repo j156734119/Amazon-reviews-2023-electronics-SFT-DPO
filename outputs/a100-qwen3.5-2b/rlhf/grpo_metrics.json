@@ -1,0 +1,96 @@
+{
+  "unique_prompts": 128,
+  "num_generations": 4,
+  "expected_completions_per_epoch": 512,
+  "runtime_seconds": 2284.579908508,
+  "peak_cuda_memory_allocated_gb": 7.7075066566467285,
+  "peak_cuda_memory_reserved_gb": 8.421875,
+  "final_logged_metrics": {
+    "completions/mean_length": 59.75,
+    "completions/clipped_ratio": 0.0,
+    "rewards/sft-merged/mean": -0.444732666015625,
+    "rewards/sft-merged/std": 0.32063624262809753,
+    "rewards/schema_reward/mean": 1.0,
+    "rewards/schema_reward/std": 0.0,
+    "rewards/evidence_reward/mean": 1.0,
+    "rewards/evidence_reward/std": 0.0,
+    "rewards/length_reward/mean": 1.0,
+    "rewards/length_reward/std": 0.0,
+    "reward": 2.305267333984375,
+    "reward_std": 0.32063621282577515,
+    "frac_reward_zero_std": 0.0,
+    "kl": 0.000557376530196052,
+    "entropy": 0.33097050338983536,
+    "clip_ratio/region_mean": 0.0
+  },
+  "reference_policy": "merged SFT policy with GRPO adapter disabled",
+  "reward_weights": {
+    "reward_model": 1.0,
+    "schema": 1.0,
+    "evidence": 1.5,
+    "length": 0.25
+  },
+  "auxiliary_model_load_in_4bit": false,
+  "auxiliary_model_dtype": "torch.bfloat16",
+  "model_device_reports": {
+    "policy": {
+      "parameter_devices": [
+        "cuda:0"
+      ],
+      "parameter_dtypes": [
+        "torch.bfloat16",
+        "torch.float32",
+        "torch.uint8"
+      ],
+      "buffer_devices": [
+        "cuda:0"
+      ],
+      "embedding_device": "cuda:0",
+      "embedding_dtype": "torch.float32",
+      "score_device": null,
+      "score_dtype": null
+    },
+    "reward": {
+      "parameter_devices": [
+        "cuda:0"
+      ],
+      "parameter_dtypes": [
+        "torch.bfloat16"
+      ],
+      "buffer_devices": [
+        "cuda:0"
+      ],
+      "embedding_device": "cuda:0",
+      "embedding_dtype": "torch.bfloat16",
+      "score_device": "cuda:0",
+      "score_dtype": "torch.bfloat16"
+    }
+  },
+  "auxiliary_preflight_reports": {
+    "reward": {
+      "logits_shape": [
+        1,
+        1
+      ],
+      "logits_device": "cuda:0",
+      "logits_dtype": "torch.bfloat16"
+    }
+  },
+  "trainer_device_reports": {
+    "reward": {
+      "parameter_devices": [
+        "cuda:0"
+      ],
+      "parameter_dtypes": [
+        "torch.bfloat16"
+      ],
+      "buffer_devices": [
+        "cuda:0"
+      ],
+      "embedding_device": "cuda:0",
+      "embedding_dtype": "torch.bfloat16",
+      "score_device": "cuda:0",
+      "score_dtype": "torch.bfloat16"
+    }
+  }
+}

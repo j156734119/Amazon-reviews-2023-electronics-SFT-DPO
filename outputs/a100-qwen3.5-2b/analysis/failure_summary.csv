@@ -1,0 +1,6 @@
+variant,instruction_following_failures
+base,79
+dpo,100
+grpo,25
+ppo,23
+sft,20

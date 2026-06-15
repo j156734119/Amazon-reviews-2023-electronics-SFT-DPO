@@ -1,0 +1,116 @@
+{
+  "episodes": 128,
+  "unique_prompts": 128,
+  "runtime_seconds": 1412.0017797649998,
+  "peak_cuda_memory_allocated_gb": 13.48516321182251,
+  "peak_cuda_memory_reserved_gb": 13.693359375,
+  "final_logged_metrics": {
+    "objective/kl": -0.16860847175121307,
+    "objective/rlhf_reward": 4.414680480957031,
+    "objective/scores": 4.40625,
+    "loss/policy_avg": 0.006341753527522087,
+    "loss/value_avg": 5.725080966949463
+  },
+  "reference_policy": "merged SFT policy with PPO adapter disabled",
+  "auxiliary_model_load_in_4bit": false,
+  "auxiliary_model_dtype": "torch.bfloat16",
+  "model_device_reports": {
+    "policy": {
+      "parameter_devices": [
+        "cuda:0"
+      ],
+      "parameter_dtypes": [
+        "torch.bfloat16",
+        "torch.float32",
+        "torch.uint8"
+      ],
+      "buffer_devices": [
+        "cuda:0"
+      ],
+      "embedding_device": "cuda:0",
+      "embedding_dtype": "torch.float32",
+      "score_device": null,
+      "score_dtype": null
+    },
+    "reward": {
+      "parameter_devices": [
+        "cuda:0"
+      ],
+      "parameter_dtypes": [
+        "torch.bfloat16"
+      ],
+      "buffer_devices": [
+        "cuda:0"
+      ],
+      "embedding_device": "cuda:0",
+      "embedding_dtype": "torch.bfloat16",
+      "score_device": "cuda:0",
+      "score_dtype": "torch.bfloat16"
+    },
+    "value": {
+      "parameter_devices": [
+        "cuda:0"
+      ],
+      "parameter_dtypes": [
+        "torch.bfloat16"
+      ],
+      "buffer_devices": [
+        "cuda:0"
+      ],
+      "embedding_device": "cuda:0",
+      "embedding_dtype": "torch.bfloat16",
+      "score_device": "cuda:0",
+      "score_dtype": "torch.bfloat16"
+    }
+  },
+  "auxiliary_preflight_reports": {
+    "reward": {
+      "logits_shape": [
+        1,
+        1
+      ],
+      "logits_device": "cuda:0",
+      "logits_dtype": "torch.bfloat16"
+    },
+    "value": {
+      "logits_shape": [
+        1,
+        1
+      ],
+      "logits_device": "cuda:0",
+      "logits_dtype": "torch.bfloat16"
+    }
+  },
+  "trainer_device_reports": {
+    "PPO Reward Model after trainer setup": {
+      "parameter_devices": [
+        "cuda:0"
+      ],
+      "parameter_dtypes": [
+        "torch.bfloat16"
+      ],
+      "buffer_devices": [
+        "cuda:0"
+      ],
+      "embedding_device": "cuda:0",
+      "embedding_dtype": "torch.bfloat16",
+      "score_device": "cuda:0",
+      "score_dtype": "torch.bfloat16"
+    },
+    "PPO Value Model after trainer setup": {
+      "parameter_devices": [
+        "cuda:0"
+      ],
+      "parameter_dtypes": [
+        "torch.bfloat16"
+      ],
+      "buffer_devices": [
+        "cuda:0"
+      ],
+      "embedding_device": "cuda:0",
+      "embedding_dtype": "torch.bfloat16",
+      "score_device": "cuda:0",
+      "score_dtype": "torch.bfloat16"
+    }
+  }
+}

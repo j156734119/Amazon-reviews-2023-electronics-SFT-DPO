@@ -169,6 +169,23 @@ Reward Model, PPO, and GRPO metrics are written below
 `outputs/a100-qwen3.5-2b/rlhf/`, including reward components, KL, entropy,
 clipping, completion lengths, runtime, and memory.
 
+### Expanded online-RL experiment
+
+The original A100 PPO/GRPO run is a 128-prompt feasibility baseline. The
+expanded profile uses 1,024 shared prompts sampled directly from the 3,500-row
+training split after excluding Reward Model examples. It does not use
+validation or test reviews:
+
+```bash
+review-align build-rlhf-data --config configs/rlhf_a100_online_v2.yaml
+review-align train-ppo --config configs/rlhf_a100_online_v2.yaml
+review-align train-grpo --config configs/rlhf_a100_online_v2.yaml
+```
+
+The adapters are saved separately under `models/ppo-v2/` and
+`models/grpo-v2/`. The tracked A100 Notebook includes archival, inference, and
+all ten pairwise AI-judge comparisons for Base, SFT, DPO, PPO v2, and GRPO v2.
+
 ## Tracked Colab workflows
 
 Two repository-driven notebooks are tracked for running the package directly

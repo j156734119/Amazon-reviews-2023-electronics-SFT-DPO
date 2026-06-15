@@ -220,6 +220,30 @@ __marimo__/
 # Project-generated artifacts
 outputs/*
 !outputs/.gitkeep
+
+# Curated public artifacts from the formal A100 experiment.
+!outputs/a100-qwen3.5-2b/
+outputs/a100-qwen3.5-2b/*
+!outputs/a100-qwen3.5-2b/README.md
+!outputs/a100-qwen3.5-2b/analysis/
+!outputs/a100-qwen3.5-2b/analysis/**
+!outputs/a100-qwen3.5-2b/evaluation/
+outputs/a100-qwen3.5-2b/evaluation/*
+!outputs/a100-qwen3.5-2b/evaluation/metrics.csv
+!outputs/a100-qwen3.5-2b/evaluation/evaluation_summary.json
+!outputs/a100-qwen3.5-2b/evaluation/metrics.png
+!outputs/a100-qwen3.5-2b/evaluation/report.md
+!outputs/a100-qwen3.5-2b/evaluation/dpo_training_history.csv
+!outputs/a100-qwen3.5-2b/evaluation/judge_pairwise_summary.csv
+!outputs/a100-qwen3.5-2b/evaluation/judge_decisions.jsonl
+!outputs/a100-qwen3.5-2b/rlhf/
+outputs/a100-qwen3.5-2b/rlhf/*
+!outputs/a100-qwen3.5-2b/rlhf/data_manifest.json
+!outputs/a100-qwen3.5-2b/rlhf/reward_metrics.json
+!outputs/a100-qwen3.5-2b/rlhf/ppo_metrics.json
+!outputs/a100-qwen3.5-2b/rlhf/grpo_metrics.json
+!outputs/a100-qwen3.5-2b/rlhf/ppo_log_history.json
+!outputs/a100-qwen3.5-2b/rlhf/grpo_log_history.json
 data/
 checkpoints/
 legacy/
