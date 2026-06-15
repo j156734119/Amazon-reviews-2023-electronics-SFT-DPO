@@ -158,6 +158,22 @@ def common_setup_cells(gpu_name: str, config_path: str) -> list[dict[str, Any]]:
                 sys.path.insert(0, source_dir)
             CONFIG = "{config_path}"
 
+            # Colab may preinstall an old TorchAO release. PEFT treats an installed
+            # but unsupported TorchAO as a hard error even though this project does
+            # not use TorchAO-backed layers.
+            try:
+                import importlib.metadata
+
+                torchao_version = importlib.metadata.version("torchao")
+            except importlib.metadata.PackageNotFoundError:
+                torchao_version = None
+            if torchao_version is not None:
+                print("Removing unused TorchAO:", torchao_version)
+                subprocess.run(
+                    [sys.executable, "-m", "pip", "uninstall", "-y", "torchao"],
+                    check=True,
+                )
+
             def training_stack_is_usable() -> bool:
                 try:
                     import amazon_review_alignment
@@ -946,6 +962,36 @@ def append_expanded_cells(path: Path) -> None:
     print(path)
 
 
+def update_colab_recovery_cell(path: Path) -> None:
+    if not path.exists():
+        return
+    value = json.loads(path.read_text(encoding="utf-8"))
+    replacement = next(
+        cell
+        for cell in common_setup_cells("A100", "configs/rlhf_a100_dpo_v2.yaml")
+        if "def training_stack_is_usable" in "".join(cell.get("source", []))
+    )
+    for cell in value["cells"]:
+        if "def training_stack_is_usable" not in "".join(cell.get("source", [])):
+            continue
+        cell["source"] = replacement["source"]
+        write_notebook(path, value)
+        print(f"Updated recovery cell: {path}")
+        return
+    for index, cell in enumerate(value["cells"][:-1]):
+        source = "".join(cell.get("source", []))
+        if "## 3. 重启后恢复目录" not in source:
+            continue
+        next_cell = value["cells"][index + 1]
+        if next_cell.get("cell_type") != "code":
+            break
+        next_cell["source"] = replacement["source"]
+        write_notebook(path, value)
+        print(f"Updated recovery cell: {path}")
+        return
+    print(f"No recovery cell found: {path}")
+
+
 def main() -> None:
     root = Path(__file__).resolve().parents[1]
     outputs = {
@@ -955,7 +1001,9 @@ def main() -> None:
     for path, value in outputs.items():
         write_notebook(path, value)
         print(path)
-    append_expanded_cells(root / "Amazon_Review_Alignment_A100—1.ipynb")
+    colab_path = root / "Amazon_Review_Alignment_A100—1.ipynb"
+    update_colab_recovery_cell(colab_path)
+    append_expanded_cells(colab_path)
 
 
 if __name__ == "__main__":
