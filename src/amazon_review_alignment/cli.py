@@ -85,6 +85,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Override the config and enable OpenAI pairwise judging.",
     )
     evaluate.add_argument(
+        "--judge-samples-per-pair",
+        type=int,
+        help="Override the number of blinded AI-judge examples per model pair.",
+    )
+    evaluate.add_argument(
         "--variants",
         nargs="+",
         choices=("base", "sft", "dpo", "ppo", "grpo"),
@@ -175,6 +180,10 @@ def main(argv: list[str] | None = None) -> None:
 
         if args.llm_judge:
             config["evaluation"]["run_llm_judge"] = True
+        if args.judge_samples_per_pair is not None:
+            if args.judge_samples_per_pair <= 0:
+                raise ValueError("--judge-samples-per-pair must be positive.")
+            config["evaluation"]["judge_samples_per_pair"] = args.judge_samples_per_pair
         if args.variants:
             config["evaluation"]["variants"] = args.variants
         command_handlers[args.command] = lambda: run_evaluation(config, args.force_inference)

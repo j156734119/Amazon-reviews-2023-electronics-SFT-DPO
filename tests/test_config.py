@@ -64,3 +64,19 @@ def test_evaluate_cli_accepts_baseline_only() -> None:
 
     assert args.command == "evaluate"
     assert args.variants == ["base"]
+
+
+def test_evaluate_cli_accepts_ai_judge_sample_override() -> None:
+    args = build_parser().parse_args(
+        [
+            "evaluate",
+            "--config",
+            "configs/rlhf_a100_dpo_v2.yaml",
+            "--llm-judge",
+            "--judge-samples-per-pair",
+            "50",
+        ]
+    )
+
+    assert args.llm_judge is True
+    assert args.judge_samples_per_pair == 50

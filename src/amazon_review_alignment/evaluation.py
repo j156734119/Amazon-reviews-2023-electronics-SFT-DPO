@@ -106,6 +106,7 @@ def _judge_pair(
 def run_llm_judge(
     config: dict[str, Any],
     predictions: dict[str, list[dict[str, Any]]],
+    resume_path: str | Path | None = None,
 ) -> list[dict[str, Any]]:
     if not os.getenv("OPENAI_API_KEY"):
         raise RuntimeError("OPENAI_API_KEY is required when LLM judging is enabled.")
@@ -117,12 +118,36 @@ def run_llm_judge(
         variant: {row["id"]: row for row in rows}
         for variant, rows in predictions.items()
     }
+    judge_model = str(config["evaluation"]["judge_model"])
+    existing_rows = (
+        read_jsonl(resume_path)
+        if resume_path is not None and Path(resume_path).exists()
+        else []
+    )
+    existing = {
+        (row.get("comparison"), str(row.get("id"))): row
+        for row in existing_rows
+        if row.get("judge_model") == judge_model
+    }
     decisions = []
     for left, right in config["evaluation"]["judge_pairs"]:
         common_ids = sorted(set(by_variant[left]) & set(by_variant[right]))
         rng.shuffle(common_ids)
         pair_limit = int(config["evaluation"].get("judge_samples_per_pair", len(common_ids)))
-        for review_id in common_ids[:pair_limit]:
+        selected_ids = common_ids[:pair_limit]
+        for index, review_id in enumerate(selected_ids, start=1):
+            comparison = f"{left}_vs_{right}"
+            existing_decision = existing.get((comparison, str(review_id)))
+            if existing_decision is not None:
+                decisions.append(existing_decision)
+                if index % 10 == 0 or index == len(selected_ids):
+                    LOGGER.info(
+                        "AI judge %s: %s/%s (resumed)",
+                        comparison,
+                        index,
+                        len(selected_ids),
+                    )
+                continue
             left_row = by_variant[left][review_id]
             right_row = by_variant[right][review_id]
             swapped = bool(rng.getrandbits(1))
@@ -132,7 +157,7 @@ def run_llm_judge(
                 shown = [(left, left_row["raw_output"]), (right, right_row["raw_output"])]
             decision = _judge_pair(
                 client,
-                config["evaluation"]["judge_model"],
+                judge_model,
                 left_row["text"],
                 shown[0][1],
                 shown[1][1],
@@ -142,19 +167,31 @@ def run_llm_judge(
                 winner = shown[0][0]
             elif decision.choice == JudgeChoice.B:
                 winner = shown[1][0]
-            decisions.append(
-                {
-                    "id": review_id,
-                    "comparison": f"{left}_vs_{right}",
-                    "left_model": left,
-                    "right_model": right,
-                    "display_a_model": shown[0][0],
-                    "display_b_model": shown[1][0],
-                    "choice": decision.choice.value,
-                    "winner": winner or "tie",
-                    "reason": decision.reason,
-                }
-            )
+            row = {
+                "id": review_id,
+                "comparison": comparison,
+                "left_model": left,
+                "right_model": right,
+                "display_a_model": shown[0][0],
+                "display_b_model": shown[1][0],
+                "choice": decision.choice.value,
+                "winner": winner or "tie",
+                "reason": decision.reason,
+                "judge_model": judge_model,
+            }
+            decisions.append(row)
+            if resume_path is not None:
+                checkpoint_path = Path(resume_path)
+                checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+                with checkpoint_path.open("a", encoding="utf-8") as handle:
+                    handle.write(json.dumps(row, ensure_ascii=False) + "\n")
+            if index % 10 == 0 or index == len(selected_ids):
+                LOGGER.info(
+                    "AI judge %s: %s/%s",
+                    comparison,
+                    index,
+                    len(selected_ids),
+                )
     return decisions
 
 
@@ -223,8 +260,9 @@ def run_evaluation(config: dict[str, Any], force_inference: bool = False) -> dic
     result: dict[str, Any] = {"local_metrics": metrics}
 
     if bool(config["evaluation"].get("run_llm_judge")):
-        decisions = run_llm_judge(config, predictions)
-        write_jsonl(evaluation_dir / "judge_decisions.jsonl", decisions)
+        decisions_path = evaluation_dir / "judge_decisions.jsonl"
+        decisions = run_llm_judge(config, predictions, resume_path=decisions_path)
+        write_jsonl(decisions_path, decisions)
         summaries = summarize_pairwise(
             decisions,
             int(config["evaluation"]["bootstrap_samples"]),

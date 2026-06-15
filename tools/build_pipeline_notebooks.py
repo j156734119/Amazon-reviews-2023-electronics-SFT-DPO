@@ -308,7 +308,9 @@ def a100_run_mode_cells() -> list[dict[str, Any]]:
             RUN_MODE = "mini"  # mini | formal
 
             if RUN_MODE == "mini":
-                merged = load_config(REPO_DIR / "configs" / "rlhf_a100.yaml")
+                merged = load_config(
+                    REPO_DIR / "configs" / "rlhf_a100_dpo_v2.yaml"
+                )
                 merged.pop("_config_path", None)
 
                 old_root = "outputs/a100-qwen3.5-2b"
@@ -378,7 +380,7 @@ def a100_run_mode_cells() -> list[dict[str, Any]]:
                 CONFIG = str(mini_path)
                 effective = merged
             elif RUN_MODE == "formal":
-                CONFIG = "configs/rlhf_a100.yaml"
+                CONFIG = "configs/rlhf_a100_dpo_v2.yaml"
                 effective = load_config(REPO_DIR / CONFIG)
             else:
                 raise ValueError("RUN_MODE must be 'mini' or 'formal'.")
@@ -577,8 +579,8 @@ def a100_rlaif_cells() -> list[dict[str, Any]]:
     ]
 
 
-def online_training_cells() -> list[dict[str, Any]]:
-    return [
+def online_training_cells(include_ai_judge: bool = False) -> list[dict[str, Any]]:
+    cells = [
         markdown(
             """
             ## 8. Reward Model、PPO 与 GRPO
@@ -602,17 +604,75 @@ def online_training_cells() -> list[dict[str, Any]]:
                 "dpo",
                 "ppo",
                 "grpo",
-                "--force-inference",
             )
             cli("build-report", "--config", CONFIG)
 
             metrics_path = output_root / "evaluation" / "metrics.csv"
-            report_path = output_root / "report.md"
+            report_path = output_root / "evaluation" / "report.md"
             display(pd.read_csv(metrics_path))
             print("Report:", report_path.resolve())
             """
         ),
     ]
+    if include_ai_judge:
+        cells.extend(
+            [
+                markdown(
+                    """
+                    ## 10. AI 盲审对比
+
+                    使用 OpenAI Judge 对相同评论的两份回答进行随机 A/B 展示。
+                    Judge 看不到模型身份，依据忠实性、证据支持、简洁性和帮助程度
+                    选择 A、B 或 tie。默认每个模型对抽取 50 条，并使用 Bootstrap
+                    计算 95% 置信区间。
+
+                    此阶段复用已有预测，不重新运行模型推理，但会产生 OpenAI API
+                    费用。中途失败时不要使用 `--force-inference`。
+                    """
+                ),
+                code(
+                    """
+                    AI_JUDGE_SAMPLES_PER_PAIR = 50
+
+                    cli(
+                        "evaluate",
+                        "--config",
+                        CONFIG,
+                        "--variants",
+                        "base",
+                        "sft",
+                        "dpo",
+                        "ppo",
+                        "grpo",
+                        "--llm-judge",
+                        "--judge-samples-per-pair",
+                        str(AI_JUDGE_SAMPLES_PER_PAIR),
+                    )
+                    cli("build-report", "--config", CONFIG)
+
+                    judge_path = (
+                        output_root
+                        / "evaluation"
+                        / "judge_pairwise_summary.csv"
+                    )
+                    decisions_path = (
+                        output_root
+                        / "evaluation"
+                        / "judge_decisions.jsonl"
+                    )
+
+                    print("===== AI BLIND JUDGE RESULTS =====")
+                    display(pd.read_csv(judge_path))
+                    print("Decisions:", decisions_path.resolve())
+                    print(
+                        "Report:",
+                        (output_root / "evaluation" / "report.md").resolve(),
+                    )
+                    """
+                ),
+            ]
+        )
+    return cells
 
 
 def notebook(cells: list[dict[str, Any]], gpu_type: str) -> dict[str, Any]:
@@ -679,7 +739,7 @@ def build_a100() -> dict[str, Any]:
         *teacher_cells(),
         *sft_dpo_cells(),
         *a100_rlaif_cells(),
-        *online_training_cells(),
+        *online_training_cells(include_ai_judge=True),
     ]
     return notebook(cells, "A100")
 

@@ -140,15 +140,22 @@ the A100 experiment remains pure RLAIF.
 ## Five-model evaluation
 
 ```bash
-review-align evaluate --config configs/rlhf_a100.yaml
-review-align evaluate --config configs/rlhf_a100.yaml --llm-judge
+review-align evaluate --config configs/rlhf_a100_dpo_v2.yaml
+review-align evaluate \
+  --config configs/rlhf_a100_dpo_v2.yaml \
+  --llm-judge \
+  --judge-samples-per-pair 50
 ```
 
 The RLHF configuration evaluates `base`, `sft`, `dpo`, `ppo`, and `grpo`.
 GRPO uses the same prompts as PPO and four completions per prompt in the A100
 profile. Its reward combines the frozen Reward Model with schema, grounded
-evidence, and length checks. A separate 200-example
-human comparison can be prepared with:
+evidence, and length checks. AI judging randomly swaps each model pair behind
+A/B labels and compares faithfulness, evidence support, concision, and
+usefulness. It reports pairwise win rates with ties counted as half and
+Bootstrap 95% confidence intervals.
+
+An optional 200-example human comparison can still be prepared with:
 
 ```bash
 review-align human-eval \
@@ -195,11 +202,13 @@ Local evaluation reports:
 - overall instruction-following rate;
 - failure examples.
 
-Optional OpenAI judging compares anonymized model outputs using the same
-faithfulness, evidence, concision, and usefulness rubric used by the human
-evaluation form. Pairwise win rates include bootstrap 95% confidence intervals.
+Optional OpenAI judging is the default semantic comparison workflow. It
+compares anonymized, randomly swapped model outputs using faithfulness,
+evidence, concision, and usefulness. Pairwise win rates include Bootstrap 95%
+confidence intervals.
 
-Human evaluation creates a blinded CSV. For each row, select `A`, `B`, or
+Human evaluation remains available as an optional validation step. It creates a
+blinded CSV. For each row, select `A`, `B`, or
 `tie` in the `choice` column, then summarize it with:
 
 ```powershell
