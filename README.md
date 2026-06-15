@@ -162,21 +162,6 @@ Reward Model, PPO, and GRPO metrics are written below
 `outputs/a100-qwen3.5-2b/rlhf/`, including reward components, KL, entropy,
 clipping, completion lengths, runtime, and memory.
 
-## Independent Colab notebook
-
-The fully self-contained notebook variant is generated outside the repository
-from a Python generator. Generate that standalone copy with:
-
-```powershell
-python tools/build_colab_notebook.py `
-  C:\Users\13105\Desktop\Amazon-review-alignment-colab\Amazon_Review_Alignment_Colab.ipynb
-```
-
-The notebook contains its own data, model, training, evaluation, Drive
-persistence, and checkpoint-resume code. It does not import this package. Keep
-`PROFILE="smoke"` for Qwen3-0.6B, then switch to `PROFILE="a100"` for
-Qwen3.5-2B after the complete smoke run succeeds.
-
 ## Tracked Colab workflows
 
 Two repository-driven notebooks are tracked for running the package directly

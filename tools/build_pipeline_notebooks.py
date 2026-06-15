@@ -146,6 +146,7 @@ def common_setup_cells(gpu_name: str, config_path: str) -> list[dict[str, Any]]:
             from pathlib import Path
 
             from google.colab import drive, userdata
+            from packaging.version import Version
 
             drive.mount("/content/drive", force_remount=False)
             REPO_DIR = Path(
@@ -157,13 +158,18 @@ def common_setup_cells(gpu_name: str, config_path: str) -> list[dict[str, Any]]:
                 sys.path.insert(0, source_dir)
             CONFIG = "{config_path}"
 
-            try:
-                import amazon_review_alignment
-                import bitsandbytes
-                import peft
-                import transformers
-                import trl
-            except (ImportError, ModuleNotFoundError):
+            def training_stack_is_usable() -> bool:
+                try:
+                    import amazon_review_alignment
+                    import bitsandbytes
+                    import peft
+                    import transformers
+                    import trl
+                except (ImportError, ModuleNotFoundError):
+                    return False
+                return Version(bitsandbytes.__version__) >= Version("0.46.1")
+
+            if not training_stack_is_usable():
                 subprocess.run(
                     [
                         sys.executable,
@@ -177,11 +183,18 @@ def common_setup_cells(gpu_name: str, config_path: str) -> list[dict[str, Any]]:
                     cwd=REPO_DIR,
                     check=True,
                 )
+
+            try:
                 import amazon_review_alignment
                 import bitsandbytes
                 import peft
                 import transformers
                 import trl
+            except (ImportError, ModuleNotFoundError) as exc:
+                raise RuntimeError(
+                    "Training dependencies are still unavailable after reinstall. "
+                    "Restart the Colab runtime and rerun this cell."
+                ) from exc
 
             for secret_name in ("OPENAI_API_KEY", "HF_TOKEN"):
                 try:
@@ -658,7 +671,7 @@ def build_a100() -> dict[str, Any]:
             消耗是动态的，不能保证固定在 100 CU 内。
             """
         ),
-        *common_setup_cells("A100", "configs/rlhf_a100.yaml"),
+        *common_setup_cells("A100", "configs/rlhf_a100_dpo_v2.yaml"),
         markdown("## A100 环境检查"),
         environment_cell("A100", 38, True),
         *a100_run_mode_cells(),

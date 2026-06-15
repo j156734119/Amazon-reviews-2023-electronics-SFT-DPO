@@ -88,14 +88,6 @@ def parse_analysis(raw: str) -> ReviewAnalysis:
     return ReviewAnalysis.model_validate(json.loads(raw))
 
 
-def schema_valid_and_grounded(raw: str, review_text: str) -> tuple[bool, bool]:
-    try:
-        analysis = parse_analysis(raw)
-    except (json.JSONDecodeError, ValueError):
-        return False, False
-    return True, analysis.evidence_is_grounded(review_text)
-
-
 def rejected_has_requested_defect(
     preference: TeacherPreference,
     review_text: str,

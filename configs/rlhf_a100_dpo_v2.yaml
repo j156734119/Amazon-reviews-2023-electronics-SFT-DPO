@@ -1,0 +1,7 @@
+extends: rlhf_a100.yaml
+
+training:
+  dpo:
+    output_dir: outputs/a100-qwen3.5-2b/models/dpo-v2
+    learning_rate: 0.00001
+    epochs: 1

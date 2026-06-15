@@ -6,7 +6,7 @@ import logging
 import random
 import re
 import subprocess
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -54,13 +54,6 @@ def stable_id(*values: object) -> str:
 def read_jsonl(path: str | Path) -> list[dict[str, Any]]:
     with Path(path).open("r", encoding="utf-8") as handle:
         return [json.loads(line) for line in handle if line.strip()]
-
-
-def iter_jsonl(path: str | Path) -> Iterator[dict[str, Any]]:
-    with Path(path).open("r", encoding="utf-8") as handle:
-        for line in handle:
-            if line.strip():
-                yield json.loads(line)
 
 
 def write_jsonl(path: str | Path, rows: Iterable[dict[str, Any]]) -> None:

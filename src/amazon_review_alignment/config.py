@@ -51,9 +51,3 @@ def load_config(path: str | Path) -> dict[str, Any]:
 
 def output_root(config: dict[str, Any]) -> Path:
     return Path(config["project"]["output_dir"]).resolve()
-
-
-def resolve_output_path(config: dict[str, Any], *parts: str) -> Path:
-    path = output_root(config).joinpath(*parts)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    return path
