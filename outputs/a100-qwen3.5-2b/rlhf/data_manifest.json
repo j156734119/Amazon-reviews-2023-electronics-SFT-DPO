@@ -9,9 +9,10 @@
   "ai_reward_train_pairs": 800,
   "ai_reward_validation_pairs": 130,
   "reward_train_pairs_total": 800,
-  "ppo_prompts": 128,
-  "grpo_prompts": 128,
+  "ppo_prompts": 1024,
+  "grpo_prompts": 1024,
   "ppo_grpo_shared_prompt_ids": true,
+  "online_prompt_source": "raw_train_excluded_from_reward_model",
   "test_rows_excluded": 1000,
   "seed": 42
 }

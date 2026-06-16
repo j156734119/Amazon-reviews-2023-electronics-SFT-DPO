@@ -1,4 +1,4 @@
 stage,examples,runtime_minutes,peak_reserved_gb,primary_metric,primary_value,diagnostic
 reward_model,130,,,preference_accuracy,0.9,mean_reward_margin=2.3178; human_held_out=0
-ppo,128,23.53336299608333,13.693359375,rlhf_reward,4.414680480957031,kl=-0.168608; policy_loss=0.006342; value_loss=5.725081
-grpo,512,38.07633180846666,8.421875,reward,2.305267333984375,kl=0.000557; clip_ratio=0.000000; schema/evidence/length reward std=0
+ppo,1024,176.83128869233332,13.8203125,rlhf_reward,3.5939865112304688,kl=-0.011823; policy_loss=0.056113; value_loss=3.856393
+grpo,4096,315.79267854678335,9.369140625,reward,-1.4664063453674316,kl=0.029740; clip_ratio=0.000000; schema/evidence/length reward std=0

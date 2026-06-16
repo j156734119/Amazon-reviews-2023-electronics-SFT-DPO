@@ -13,8 +13,8 @@ The comparison uses identical prompts, decoding settings, and held-out reviews. 
 | base | 500 | 95.4% | 84.2% | 95.4% | 84.2% |
 | sft | 500 | 100.0% | 96.0% | 100.0% | 96.0% |
 | dpo | 500 | 84.6% | 80.0% | 84.6% | 80.0% |
-| ppo | 500 | 100.0% | 95.4% | 100.0% | 95.4% |
-| grpo | 500 | 100.0% | 95.0% | 100.0% | 95.0% |
+| ppo | 500 | 100.0% | 95.2% | 100.0% | 95.2% |
+| grpo | 500 | 100.0% | 94.8% | 100.0% | 94.8% |
 
 ![Evaluation metrics](metrics.png)
 
@@ -24,13 +24,16 @@ The comparison uses identical prompts, decoding settings, and held-out reviews. 
 
 | Comparison | N | Right-model win rate | 95% CI | Ties |
 |---|---:|---:|---:|---:|
-| base_vs_sft | 50 | 57.0% | 44.0%–70.0% | 3 |
-| sft_vs_dpo | 50 | 75.0% | 64.0%–85.0% | 7 |
-| sft_vs_ppo | 50 | 41.0% | 31.0%–52.0% | 19 |
-| sft_vs_grpo | 50 | 48.0% | 37.0%–59.0% | 20 |
-| dpo_vs_ppo | 50 | 36.0% | 25.0%–48.0% | 10 |
-| dpo_vs_grpo | 50 | 40.0% | 28.0%–52.0% | 12 |
-| ppo_vs_grpo | 50 | 46.0% | 41.0%–50.0% | 44 |
+| base_vs_sft | 100 | 52.5% | 43.0%–61.5% | 5 |
+| base_vs_dpo | 100 | 57.5% | 48.0%–67.0% | 5 |
+| base_vs_ppo | 100 | 45.0% | 35.5%–54.5% | 4 |
+| base_vs_grpo | 100 | 49.5% | 40.0%–59.0% | 7 |
+| sft_vs_dpo | 100 | 60.5% | 51.5%–69.5% | 13 |
+| sft_vs_ppo | 100 | 53.5% | 46.0%–61.0% | 43 |
+| sft_vs_grpo | 100 | 48.0% | 40.0%–56.0% | 30 |
+| dpo_vs_ppo | 100 | 47.5% | 38.5%–56.0% | 21 |
+| dpo_vs_grpo | 100 | 41.0% | 32.5%–49.5% | 22 |
+| ppo_vs_grpo | 100 | 50.5% | 44.0%–57.0% | 57 |
 
 ## Reward Model
 
@@ -41,43 +44,43 @@ The comparison uses identical prompts, decoding settings, and held-out reviews. 
 
 ## PPO feasibility metrics
 
-- Episodes: 128
-- Unique prompts: 128
-- Runtime: 23.5 minutes
-- Peak allocated CUDA memory: 13.49 GiB
-- Peak reserved CUDA memory: 13.69 GiB
+- Episodes: 1024
+- Unique prompts: 1024
+- Runtime: 176.8 minutes
+- Peak allocated CUDA memory: 13.62 GiB
+- Peak reserved CUDA memory: 13.82 GiB
 - Reference policy: merged SFT policy with the PPO adapter disabled.
-- `objective/kl`: -0.168608
-- `objective/rlhf_reward`: 4.414680
-- `objective/scores`: 4.406250
-- `loss/policy_avg`: 0.006342
-- `loss/value_avg`: 5.725081
+- `objective/kl`: -0.011823
+- `objective/rlhf_reward`: 3.593987
+- `objective/scores`: 3.593750
+- `loss/policy_avg`: 0.056113
+- `loss/value_avg`: 3.856393
 
 ## GRPO feasibility metrics
 
-- Unique prompts: 128
+- Unique prompts: 1024
 - Generations per prompt: 4
-- Expected completions per epoch: 512
-- Runtime: 38.1 minutes
-- Peak allocated CUDA memory: 7.71 GiB
-- Peak reserved CUDA memory: 8.42 GiB
+- Expected completions per epoch: 4096
+- Runtime: 315.8 minutes
+- Peak allocated CUDA memory: 8.49 GiB
+- Peak reserved CUDA memory: 9.37 GiB
 - Reference policy: merged SFT policy with the GRPO adapter disabled.
-- Reward weights: `{"reward_model": 1.0, "schema": 1.0, "evidence": 1.5, "length": 0.25}`
-- `completions/mean_length`: 59.750000
+- Reward weights: `{"reward_model": 2.0, "schema": 0.25, "evidence": 0.5, "length": 0.1}`
+- `completions/mean_length`: 63.750000
 - `completions/clipped_ratio`: 0.000000
-- `rewards/sft-merged/mean`: -0.444733
-- `rewards/sft-merged/std`: 0.320636
+- `rewards/sft-merged/mean`: -1.158203
+- `rewards/sft-merged/std`: 0.963662
 - `rewards/schema_reward/mean`: 1.000000
 - `rewards/schema_reward/std`: 0.000000
 - `rewards/evidence_reward/mean`: 1.000000
 - `rewards/evidence_reward/std`: 0.000000
 - `rewards/length_reward/mean`: 1.000000
 - `rewards/length_reward/std`: 0.000000
-- `reward`: 2.305267
-- `reward_std`: 0.320636
+- `reward`: -1.466406
+- `reward_std`: 1.927324
 - `frac_reward_zero_std`: 0.000000
-- `kl`: 0.000557
-- `entropy`: 0.330971
+- `kl`: 0.029740
+- `entropy`: 0.588886
 - `clip_ratio/region_mean`: 0.000000
 
 ## Interpretation constraints

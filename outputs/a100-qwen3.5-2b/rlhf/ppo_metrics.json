@@ -1,15 +1,15 @@
 {
-  "episodes": 128,
-  "unique_prompts": 128,
-  "runtime_seconds": 1412.0017797649998,
-  "peak_cuda_memory_allocated_gb": 13.48516321182251,
-  "peak_cuda_memory_reserved_gb": 13.693359375,
+  "episodes": 1024,
+  "unique_prompts": 1024,
+  "runtime_seconds": 10609.87732154,
+  "peak_cuda_memory_allocated_gb": 13.615662574768066,
+  "peak_cuda_memory_reserved_gb": 13.8203125,
   "final_logged_metrics": {
-    "objective/kl": -0.16860847175121307,
-    "objective/rlhf_reward": 4.414680480957031,
-    "objective/scores": 4.40625,
-    "loss/policy_avg": 0.006341753527522087,
-    "loss/value_avg": 5.725080966949463
+    "objective/kl": -0.011822521686553955,
+    "objective/rlhf_reward": 3.5939865112304688,
+    "objective/scores": 3.59375,
+    "loss/policy_avg": 0.05611294507980347,
+    "loss/value_avg": 3.856393337249756
   },
   "reference_policy": "merged SFT policy with PPO adapter disabled",
   "auxiliary_model_load_in_4bit": false,

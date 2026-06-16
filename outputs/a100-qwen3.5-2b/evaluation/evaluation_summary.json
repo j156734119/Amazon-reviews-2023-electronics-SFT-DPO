@@ -28,17 +28,119 @@
       "variant": "ppo",
       "examples": 500,
       "schema_valid_rate": 1.0,
-      "evidence_grounded_rate": 0.954,
+      "evidence_grounded_rate": 0.952,
       "word_limit_ok_rate": 1.0,
-      "instruction_following_rate": 0.954
+      "instruction_following_rate": 0.952
     },
     {
       "variant": "grpo",
       "examples": 500,
       "schema_valid_rate": 1.0,
-      "evidence_grounded_rate": 0.95,
+      "evidence_grounded_rate": 0.948,
       "word_limit_ok_rate": 1.0,
-      "instruction_following_rate": 0.95
+      "instruction_following_rate": 0.948
+    }
+  ],
+  "judge_pairwise": [
+    {
+      "comparison": "base_vs_sft",
+      "examples": 100,
+      "left_model": "base",
+      "right_model": "sft",
+      "right_model_win_rate_ties_half": 0.525,
+      "ci_95_low": 0.43,
+      "ci_95_high": 0.615,
+      "ties": 5
+    },
+    {
+      "comparison": "base_vs_dpo",
+      "examples": 100,
+      "left_model": "base",
+      "right_model": "dpo",
+      "right_model_win_rate_ties_half": 0.575,
+      "ci_95_low": 0.48,
+      "ci_95_high": 0.67,
+      "ties": 5
+    },
+    {
+      "comparison": "base_vs_ppo",
+      "examples": 100,
+      "left_model": "base",
+      "right_model": "ppo",
+      "right_model_win_rate_ties_half": 0.45,
+      "ci_95_low": 0.355,
+      "ci_95_high": 0.545,
+      "ties": 4
+    },
+    {
+      "comparison": "base_vs_grpo",
+      "examples": 100,
+      "left_model": "base",
+      "right_model": "grpo",
+      "right_model_win_rate_ties_half": 0.495,
+      "ci_95_low": 0.4,
+      "ci_95_high": 0.59,
+      "ties": 7
+    },
+    {
+      "comparison": "sft_vs_dpo",
+      "examples": 100,
+      "left_model": "sft",
+      "right_model": "dpo",
+      "right_model_win_rate_ties_half": 0.605,
+      "ci_95_low": 0.515,
+      "ci_95_high": 0.695,
+      "ties": 13
+    },
+    {
+      "comparison": "sft_vs_ppo",
+      "examples": 100,
+      "left_model": "sft",
+      "right_model": "ppo",
+      "right_model_win_rate_ties_half": 0.535,
+      "ci_95_low": 0.46,
+      "ci_95_high": 0.61,
+      "ties": 43
+    },
+    {
+      "comparison": "sft_vs_grpo",
+      "examples": 100,
+      "left_model": "sft",
+      "right_model": "grpo",
+      "right_model_win_rate_ties_half": 0.48,
+      "ci_95_low": 0.4,
+      "ci_95_high": 0.56,
+      "ties": 30
+    },
+    {
+      "comparison": "dpo_vs_ppo",
+      "examples": 100,
+      "left_model": "dpo",
+      "right_model": "ppo",
+      "right_model_win_rate_ties_half": 0.475,
+      "ci_95_low": 0.385,
+      "ci_95_high": 0.56,
+      "ties": 21
+    },
+    {
+      "comparison": "dpo_vs_grpo",
+      "examples": 100,
+      "left_model": "dpo",
+      "right_model": "grpo",
+      "right_model_win_rate_ties_half": 0.41,
+      "ci_95_low": 0.325,
+      "ci_95_high": 0.495,
+      "ties": 22
+    },
+    {
+      "comparison": "ppo_vs_grpo",
+      "examples": 100,
+      "left_model": "ppo",
+      "right_model": "grpo",
+      "right_model_win_rate_ties_half": 0.505,
+      "ci_95_low": 0.44,
+      "ci_95_high": 0.57,
+      "ties": 57
     }
   ]
 }

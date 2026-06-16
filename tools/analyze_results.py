@@ -174,6 +174,12 @@ def write_analysis(
     indexed = metrics.set_index("variant")
     failure_counts = failures.groupby("variant").size().to_dict()
     agreement = pairwise_agreement.set_index("comparison")
+    reward_metrics = read_json(root / "rlhf" / "reward_metrics.json")
+    ppo = read_json(root / "rlhf" / "ppo_metrics.json")
+    grpo = read_json(root / "rlhf" / "grpo_metrics.json")
+    ppo_metrics = ppo["final_logged_metrics"]
+    grpo_metrics = grpo["final_logged_metrics"]
+    reward_validation = reward_metrics["ai_validation"]
     lines = [
         "# A100 Qwen3.5-2B Experiment Analysis",
         "",
@@ -198,13 +204,19 @@ def write_analysis(
             f"{indexed.loc['grpo', 'evidence_grounded_rate']:.1%}) but did not exceed SFT locally."
         ),
         (
-            "- The Reward Model reached 90.0% preference accuracy on 130 AI-generated validation "
-            "pairs, but no held-out human preferences were available."
+            "- The Reward Model reached "
+            f"{reward_validation['preference_accuracy']:.1%} preference accuracy on "
+            f"{int(reward_validation['examples'])} AI-generated validation pairs, "
+            "but no held-out human preferences were available."
         ),
         (
             "- GRPO rule rewards were fully saturated: schema, evidence, and length "
-            "reward standard deviations were all zero. KL was 0.000557 and clip ratio "
-            "was zero, indicating very limited policy movement."
+            "reward standard deviations were "
+            f"{grpo_metrics['rewards/schema_reward/std']:.3f}, "
+            f"{grpo_metrics['rewards/evidence_reward/std']:.3f}, and "
+            f"{grpo_metrics['rewards/length_reward/std']:.3f}. KL was "
+            f"{grpo_metrics['kl']:.6f} and clip ratio was "
+            f"{grpo_metrics['clip_ratio/region_mean']:.6f}."
         ),
         (
             "- PPO and GRPO produced exactly identical outputs on "
@@ -219,8 +231,10 @@ def write_analysis(
             "which further suggests that the PPO budget mostly preserved the SFT policy."
         ),
         (
-            "- PPO used 128 episodes. Its value loss remained 5.7251, so the value function was "
-            "not yet a strong estimator under this limited rollout budget."
+            f"- PPO used {int(ppo['episodes'])} episodes over "
+            f"{int(ppo['unique_prompts'])} unique prompts. Its final value loss was "
+            f"{ppo_metrics['loss/value_avg']:.4f}, so the value function should still be "
+            "treated as a limited-budget estimator rather than a fully converged critic."
         ),
         "",
         "## Instruction-following failures",
