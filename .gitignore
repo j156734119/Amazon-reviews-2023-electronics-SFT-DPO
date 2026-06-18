@@ -236,6 +236,9 @@ outputs/a100-qwen3.5-2b/evaluation/*
 !outputs/a100-qwen3.5-2b/evaluation/dpo_training_history.csv
 !outputs/a100-qwen3.5-2b/evaluation/judge_pairwise_summary.csv
 !outputs/a100-qwen3.5-2b/evaluation/judge_decisions.jsonl
+!outputs/a100-qwen3.5-2b/evaluation/deepseek_judge_pairwise_summary.csv
+!outputs/a100-qwen3.5-2b/evaluation/deepseek_judge_decisions.jsonl
+!outputs/a100-qwen3.5-2b/evaluation/deepseek_judge_summary.md
 !outputs/a100-qwen3.5-2b/rlhf/
 outputs/a100-qwen3.5-2b/rlhf/*
 !outputs/a100-qwen3.5-2b/rlhf/data_manifest.json

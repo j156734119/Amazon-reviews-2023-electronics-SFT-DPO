@@ -186,6 +186,28 @@ The adapters are saved separately under `models/ppo-v2/` and
 `models/grpo-v2/`. The tracked A100 Notebook includes archival, inference, and
 all ten pairwise AI-judge comparisons for Base, SFT, DPO, PPO v2, and GRPO v2.
 
+### DeepSeek cross-judge
+
+OpenAI teacher data and OpenAI LLM judging can share the same preference style.
+To reduce that teacher-judge leakage, run an optional DeepSeek blind judge over
+the already generated local predictions. This step does not require GPU,
+training, or inference:
+
+```powershell
+$env:DEEPSEEK_API_KEY="your-deepseek-api-key"
+
+python tools/deepseek_judge.py `
+  --config configs/rlhf_a100_online_v2.yaml `
+  --root outputs/a100-qwen3.5-2b `
+  --samples-per-pair 100 `
+  --model deepseek-v4-pro
+```
+
+The script writes separate artifacts under `outputs/a100-qwen3.5-2b/evaluation/`:
+`deepseek_judge_decisions.jsonl`, `deepseek_judge_pairwise_summary.csv`, and
+`deepseek_judge_summary.md`. Re-running resumes from the existing DeepSeek
+decision log and does not overwrite OpenAI judge outputs.
+
 ## Tracked Colab workflows
 
 Two repository-driven notebooks are tracked for running the package directly
@@ -219,10 +241,11 @@ Local evaluation reports:
 - overall instruction-following rate;
 - failure examples.
 
-Optional OpenAI judging is the default semantic comparison workflow. It
-compares anonymized, randomly swapped model outputs using faithfulness,
-evidence, concision, and usefulness. Pairwise win rates include Bootstrap 95%
-confidence intervals.
+Optional OpenAI judging is the default semantic comparison workflow. DeepSeek
+judging is available as an independent cross-judge check. Both compare
+anonymized, randomly swapped model outputs using faithfulness, evidence,
+concision, and usefulness. Pairwise win rates include Bootstrap 95% confidence
+intervals.
 
 Human evaluation remains available as an optional validation step. It creates a
 blinded CSV. For each row, select `A`, `B`, or
