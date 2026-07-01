@@ -5,12 +5,15 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
+from .baselines import BASELINE_VARIANTS, run_baseline_inference
 from .config import output_root
 from .modeling import load_policy_model, load_tokenizer, render_chat, sft_merged_path
 from .prompts import SYSTEM_PROMPT, analysis_user_prompt
 from .utils import read_jsonl, save_run_metadata, set_seed, write_jsonl
 
 LOGGER = logging.getLogger(__name__)
+TRAINED_VARIANTS = ("base", "sft", "dpo", "ppo", "grpo")
+ALL_VARIANTS = (*TRAINED_VARIANTS, *BASELINE_VARIANTS)
 
 
 def generation_prompt(tokenizer: Any, review_text: str) -> str:
@@ -83,6 +86,9 @@ def run_inference(
     force: bool = False,
 ) -> Path:
     set_seed(int(config["project"]["seed"]))
+    if variant in BASELINE_VARIANTS:
+        return run_baseline_inference(config, variant, force)
+
     prediction_dir = output_root(config) / "evaluation" / "predictions"
     prediction_dir.mkdir(parents=True, exist_ok=True)
     output_path = prediction_dir / f"{variant}.jsonl"

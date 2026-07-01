@@ -22,7 +22,35 @@ rlhf:
       evidence: 0.5
       length: 0.1
 
+baselines:
+  qwen35_2b_fewshot:
+    model_id: Qwen/Qwen3.5-2B
+    prompt_mode: few_shot
+    load_in_4bit: true
+  phi4_mini_fewshot:
+    model_id: microsoft/Phi-4-mini-instruct
+    prompt_mode: few_shot
+    load_in_4bit: true
+  nlptown_template:
+    model_id: nlptown/bert-base-multilingual-uncased-sentiment
+  deepseek_v4_pro_fewshot:
+    model_id: deepseek-v4-pro
+    prompt_mode: few_shot
+    base_url: https://api.deepseek.com
+    max_retries: 3
+    retry_seconds: 1.0
+
 evaluation:
+  variants:
+    - base
+    - sft
+    - dpo
+    - ppo
+    - grpo
+    - qwen35_2b_fewshot
+    - phi4_mini_fewshot
+    - nlptown_template
+    - deepseek_v4_pro_fewshot
   judge_samples_per_pair: 100
   judge_pairs:
     - [base, sft]
@@ -35,3 +63,9 @@ evaluation:
     - [dpo, ppo]
     - [dpo, grpo]
     - [ppo, grpo]
+    - [sft, qwen35_2b_fewshot]
+    - [dpo, qwen35_2b_fewshot]
+    - [dpo, phi4_mini_fewshot]
+    - [dpo, deepseek_v4_pro_fewshot]
+    - [ppo, deepseek_v4_pro_fewshot]
+    - [grpo, deepseek_v4_pro_fewshot]

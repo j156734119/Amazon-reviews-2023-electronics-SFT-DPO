@@ -186,6 +186,35 @@ The adapters are saved separately under `models/ppo-v2/` and
 `models/grpo-v2/`. The tracked A100 Notebook includes archival, inference, and
 all ten pairwise AI-judge comparisons for Base, SFT, DPO, PPO v2, and GRPO v2.
 
+### Baseline model inference
+
+The A100 online profile can also evaluate four non-training baselines with the
+same test set, schema checks, pairwise judges, and reports:
+
+- `qwen35_2b_fewshot`: `Qwen/Qwen3.5-2B` with fixed few-shot examples.
+- `phi4_mini_fewshot`: `microsoft/Phi-4-mini-instruct` with the same few-shot examples.
+- `nlptown_template`: `nlptown/bert-base-multilingual-uncased-sentiment` plus evidence sentence selection and a JSON template.
+- `deepseek_v4_pro_fewshot`: DeepSeek API few-shot strong baseline.
+
+Run them as ordinary variants:
+
+```powershell
+review-align inference --config configs/rlhf_a100_online_v2.yaml --variant qwen35_2b_fewshot
+review-align inference --config configs/rlhf_a100_online_v2.yaml --variant phi4_mini_fewshot
+review-align inference --config configs/rlhf_a100_online_v2.yaml --variant nlptown_template
+
+$env:DEEPSEEK_API_KEY="your-deepseek-api-key"
+review-align inference --config configs/rlhf_a100_online_v2.yaml --variant deepseek_v4_pro_fewshot
+
+review-align evaluate --config configs/rlhf_a100_online_v2.yaml `
+  --variants base sft dpo ppo grpo qwen35_2b_fewshot phi4_mini_fewshot nlptown_template deepseek_v4_pro_fewshot
+```
+
+The baseline purpose is to compare post-trained Qwen policies with prompt-only,
+template, and external API references on this narrow grounded review-analysis
+task. It is not a claim that Qwen3.5-2B exceeds DeepSeek or GPT-class models in
+general capability.
+
 ### DeepSeek cross-judge
 
 OpenAI teacher data and OpenAI LLM judging can share the same preference style.

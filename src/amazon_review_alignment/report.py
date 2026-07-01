@@ -103,6 +103,34 @@ def build_report(config: dict[str, Any]) -> Path:
     if has_plot:
         lines.extend(["", "![Evaluation metrics](metrics.png)"])
 
+    baseline_labels = {
+        "qwen35_2b_fewshot": "HF prompt-only baseline",
+        "phi4_mini_fewshot": "HF prompt-only baseline",
+        "nlptown_template": "sentiment-classifier template baseline",
+        "deepseek_v4_pro_fewshot": "API strong baseline",
+    }
+    present_baselines = [
+        str(row["variant"])
+        for _, row in metrics.iterrows()
+        if str(row["variant"]) in baseline_labels
+    ]
+    if present_baselines:
+        lines.extend(
+            [
+                "",
+                "## Baseline comparison",
+                "",
+                ("These baselines are not trained by this project. They locate the "
+                "post-trained Qwen policies against prompt-only, template, and "
+                "external API references."),
+                "",
+                "| Baseline | Type |",
+                "|---|---|",
+            ]
+        )
+        for variant in present_baselines:
+            lines.append(f"| {variant} | {baseline_labels[variant]} |")
+
     lines.extend(["", "## Pairwise evaluation", ""])
     if judge is None and human is None:
         lines.append(

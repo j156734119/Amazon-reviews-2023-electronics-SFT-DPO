@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from .config import load_config
+from .inference import ALL_VARIANTS
 from .utils import configure_logging
 
 
@@ -71,7 +72,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_common_arguments(inference)
     inference.add_argument(
         "--variant",
-        choices=("base", "sft", "dpo", "ppo", "grpo"),
+        choices=ALL_VARIANTS,
         required=True,
     )
     inference.add_argument("--force", action="store_true")
@@ -92,8 +93,8 @@ def build_parser() -> argparse.ArgumentParser:
     evaluate.add_argument(
         "--variants",
         nargs="+",
-        choices=("base", "sft", "dpo", "ppo", "grpo"),
-        help="Evaluate only these variants, for example: --variants base sft.",
+        choices=ALL_VARIANTS,
+        help="Evaluate only these variants, for example: --variants base sft qwen35_2b_fewshot.",
     )
 
     human = subparsers.add_parser("human-eval")

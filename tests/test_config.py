@@ -66,16 +66,25 @@ def test_expanded_online_profile_uses_shared_1024_prompt_budget() -> None:
     assert config["rlhf"]["grpo"]["prompt_count"] == 1024
     assert config["rlhf"]["ppo"]["output_dir"].endswith("models/ppo-v2")
     assert config["rlhf"]["grpo"]["output_dir"].endswith("models/grpo-v2")
-    assert len(config["evaluation"]["judge_pairs"]) == 10
+    assert len(config["evaluation"]["judge_pairs"]) == 16
+    assert "qwen35_2b_fewshot" in config["evaluation"]["variants"]
+    assert "deepseek_v4_pro_fewshot" in config["evaluation"]["variants"]
 
 
 def test_evaluate_cli_accepts_baseline_only() -> None:
     args = build_parser().parse_args(
-        ["evaluate", "--config", "configs/rlhf_smoke.yaml", "--variants", "base"]
+        [
+            "evaluate",
+            "--config",
+            "configs/rlhf_smoke.yaml",
+            "--variants",
+            "base",
+            "qwen35_2b_fewshot",
+        ]
     )
 
     assert args.command == "evaluate"
-    assert args.variants == ["base"]
+    assert args.variants == ["base", "qwen35_2b_fewshot"]
 
 
 def test_evaluate_cli_accepts_ai_judge_sample_override() -> None:
