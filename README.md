@@ -237,17 +237,19 @@ The script writes separate artifacts under `outputs/a100-qwen3.5-2b/evaluation/`
 `deepseek_judge_summary.md`. Re-running resumes from the existing DeepSeek
 decision log and does not overwrite OpenAI judge outputs.
 
-## Tracked Colab workflows
+## Tracked Colab workflow
 
-Two repository-driven notebooks are tracked for running the package directly
-from GitHub:
+One repository-driven notebook is tracked for running the package directly from
+GitHub:
 
-- `Amazon_Review_Alignment_T4_Smoke.ipynb`: Qwen3-0.6B end-to-end smoke.
-- `Amazon_Review_Alignment_A100.ipynb`: Qwen3.5-2B formal A100 workflow.
+- `Amazon_Review_Alignment_A100.ipynb`: a single A100 flow that first runs an
+  isolated Qwen3.5-2B smoke test, then runs the formal A100 online profile, and
+  finally evaluates the trained policies alongside the configured baselines.
 
-They mount Google Drive, clone the `main` branch, install the package, call the
-same CLI as the Python project, and keep ignored training outputs in the Drive
-workspace. Push local source changes before opening either notebook in Colab.
+It mounts Google Drive, clones or fast-forwards the `main` branch, installs the
+package, calls the same CLI as the Python project, and keeps ignored training
+outputs in the Drive workspace. Push local source changes before opening the
+notebook in Colab.
 
 ## Teacher generation and cost control
 
