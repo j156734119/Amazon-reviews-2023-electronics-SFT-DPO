@@ -4,6 +4,8 @@ import pytest
 
 from amazon_review_alignment.cli import build_parser
 from amazon_review_alignment.config import load_config
+from amazon_review_alignment.inference import prediction_cache_matches
+from amazon_review_alignment.utils import write_json, write_jsonl
 
 
 def test_config_inheritance_deep_merges_relative_parent(tmp_path: Path) -> None:
@@ -37,14 +39,10 @@ def test_config_inheritance_rejects_cycles(tmp_path: Path) -> None:
         load_config(first)
 
 
-def test_model_profiles_separate_smoke_and_a100_outputs() -> None:
+def test_current_a100_profile_uses_expected_base_and_rlhf_defaults() -> None:
     root = Path(__file__).resolve().parents[1]
-    smoke = load_config(root / "configs" / "rlhf_smoke.yaml")
     a100 = load_config(root / "configs" / "rlhf_a100.yaml")
 
-    assert smoke["model"]["base_model"] == "Qwen/Qwen3-0.6B"
-    assert smoke["training"]["sft"]["fp16"] is True
-    assert smoke["training"]["sft"]["bf16"] is False
     assert a100["model"]["base_model"] == "Qwen/Qwen3.5-2B"
     assert a100["training"]["sft"]["fp16"] is False
     assert a100["training"]["sft"]["bf16"] is True
@@ -53,8 +51,6 @@ def test_model_profiles_separate_smoke_and_a100_outputs() -> None:
     assert a100["rlhf"]["ppo"]["auxiliary_model_load_in_4bit"] is False
     assert a100["rlhf"]["grpo"]["prompt_count"] == 128
     assert a100["rlhf"]["grpo"]["auxiliary_model_load_in_4bit"] is False
-    assert smoke["rlhf"]["ppo"]["auxiliary_model_load_in_4bit"] is True
-    assert smoke["project"]["output_dir"] != a100["project"]["output_dir"]
 
 
 def test_expanded_online_profile_uses_shared_1024_prompt_budget() -> None:
@@ -66,7 +62,7 @@ def test_expanded_online_profile_uses_shared_1024_prompt_budget() -> None:
     assert config["rlhf"]["grpo"]["prompt_count"] == 1024
     assert config["rlhf"]["ppo"]["output_dir"].endswith("models/ppo-v2")
     assert config["rlhf"]["grpo"]["output_dir"].endswith("models/grpo-v2")
-    assert len(config["evaluation"]["judge_pairs"]) == 16
+    assert len(config["evaluation"]["judge_pairs"]) == 15
     assert "qwen35_2b_fewshot" in config["evaluation"]["variants"]
     assert "deepseek_v4_pro_fewshot" in config["evaluation"]["variants"]
 
@@ -76,7 +72,7 @@ def test_evaluate_cli_accepts_baseline_only() -> None:
         [
             "evaluate",
             "--config",
-            "configs/rlhf_smoke.yaml",
+            "configs/rlhf_a100_online_v2.yaml",
             "--variants",
             "base",
             "qwen35_2b_fewshot",
@@ -101,3 +97,50 @@ def test_evaluate_cli_accepts_ai_judge_sample_override() -> None:
 
     assert args.llm_judge is True
     assert args.judge_samples_per_pair == 50
+
+
+def test_prediction_cache_requires_matching_adapter_metadata(tmp_path: Path) -> None:
+    prediction_path = tmp_path / "ppo.jsonl"
+    metadata_dir = tmp_path / "ppo_run"
+    target_ids = ["r1"]
+    expected = {
+        "variant": "ppo",
+        "base_model": "outputs/a100-qwen3.5-2b/models/sft-merged",
+        "adapter_path": "outputs/a100-qwen3.5-2b/models/ppo-v2",
+        "examples": 1,
+        "target_ids_sha256": "abc",
+    }
+    write_jsonl(
+        prediction_path,
+        [
+            {
+                "id": "r1",
+                "text": "review",
+                "variant": "ppo",
+                "raw_output": "{}",
+            }
+        ],
+    )
+    write_json(
+        metadata_dir / "run_metadata.yaml",
+        {
+            **expected,
+            "adapter_path": "outputs/a100-qwen3.5-2b/models/ppo",
+        },
+    )
+
+    assert not prediction_cache_matches(
+        prediction_path,
+        metadata_dir,
+        expected,
+        target_ids,
+    )
+
+    write_json(metadata_dir / "run_metadata.yaml", expected)
+
+    assert prediction_cache_matches(
+        prediction_path,
+        metadata_dir,
+        expected,
+        target_ids,
+    )

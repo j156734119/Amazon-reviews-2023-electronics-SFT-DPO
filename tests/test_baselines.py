@@ -16,7 +16,6 @@ from amazon_review_alignment.evaluation import evaluate_output, evaluate_predict
 def test_baseline_variants_include_expected_names() -> None:
     assert set(BASELINE_VARIANTS) == {
         "qwen35_2b_fewshot",
-        "phi4_mini_fewshot",
         "nlptown_template",
         "deepseek_v4_pro_fewshot",
     }
@@ -96,7 +95,10 @@ def test_deepseek_fewshot_response_uses_env_key_and_json_mode(monkeypatch) -> No
             return FakeResponse()
 
     monkeypatch.setenv("DEEPSEEK_API_KEY", "test-key")
-    monkeypatch.setattr("amazon_review_alignment.baselines.httpx.Client", FakeClient)
+    monkeypatch.setattr(
+        "amazon_review_alignment.baselines._httpx_client",
+        lambda timeout: FakeClient(timeout),
+    )
 
     raw = deepseek_fewshot_response(
         {"model_id": "deepseek-test", "base_url": "https://api.deepseek.com"},

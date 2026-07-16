@@ -249,7 +249,6 @@ outputs/a100-qwen3.5-2b/rlhf/*
 !outputs/a100-qwen3.5-2b/rlhf/grpo_log_history.json
 data/
 checkpoints/
-legacy/
 *.safetensors
 adapter_model.bin
 wandb/

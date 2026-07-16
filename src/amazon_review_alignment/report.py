@@ -105,7 +105,6 @@ def build_report(config: dict[str, Any]) -> Path:
 
     baseline_labels = {
         "qwen35_2b_fewshot": "HF prompt-only baseline",
-        "phi4_mini_fewshot": "HF prompt-only baseline",
         "nlptown_template": "sentiment-classifier template baseline",
         "deepseek_v4_pro_fewshot": "API strong baseline",
     }

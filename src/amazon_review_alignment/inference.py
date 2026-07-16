@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import json
 import logging
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
+
+import yaml
 
 from .baselines import BASELINE_VARIANTS, run_baseline_inference
 from .config import output_root
@@ -80,6 +83,33 @@ def model_config_for_variant(
     return model_config
 
 
+def prediction_cache_matches(
+    output_path: Path,
+    metadata_dir: Path,
+    expected: dict[str, Any],
+    target_ids: list[str],
+) -> bool:
+    if not output_path.exists():
+        return False
+    try:
+        rows = read_jsonl(output_path)
+    except (OSError, json.JSONDecodeError):
+        return False
+    if [str(row.get("id")) for row in rows] != target_ids:
+        return False
+
+    metadata_path = metadata_dir / "run_metadata.yaml"
+    if not metadata_path.exists():
+        return False
+    try:
+        metadata = yaml.safe_load(metadata_path.read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError):
+        return False
+    if not isinstance(metadata, dict):
+        return False
+    return all(metadata.get(key) == value for key, value in expected.items())
+
+
 def run_inference(
     config: dict[str, Any],
     variant: str,
@@ -92,19 +122,32 @@ def run_inference(
     prediction_dir = output_root(config) / "evaluation" / "predictions"
     prediction_dir.mkdir(parents=True, exist_ok=True)
     output_path = prediction_dir / f"{variant}.jsonl"
-    if output_path.exists() and not force:
-        LOGGER.info("Reusing existing predictions: %s", output_path)
-        return output_path
 
     test_rows = read_jsonl(output_root(config) / "data" / "test.jsonl")
     limit = int(config["evaluation"]["max_test_samples"])
     test_rows = test_rows[:limit]
+    target_ids = [str(row["id"]) for row in test_rows]
     variant_model_config = model_config_for_variant(config, variant)
+    adapter_path = adapter_for_variant(config, variant)
+    expected_cache = {
+        "variant": variant,
+        "base_model": str(variant_model_config["base_model"]),
+        "adapter_path": str(adapter_path) if adapter_path else None,
+        "examples": len(test_rows),
+        "target_ids_sha256": _ids_hash(target_ids),
+    }
+    metadata_dir = prediction_dir / f"{variant}_run"
+    if (
+        not force
+        and prediction_cache_matches(output_path, metadata_dir, expected_cache, target_ids)
+    ):
+        LOGGER.info("Reusing existing predictions: %s", output_path)
+        return output_path
+
     tokenizer = load_tokenizer(
         variant_model_config["base_model"],
         padding_side="left",
     )
-    adapter_path = adapter_for_variant(config, variant)
     if adapter_path and not adapter_path.exists():
         raise RuntimeError(f"{variant.upper()} adapter does not exist: {adapter_path}")
     model = load_policy_model(
@@ -129,13 +172,15 @@ def run_inference(
             LOGGER.info("%s inference: %s/%s", variant, index, len(test_rows))
     write_jsonl(output_path, predictions)
     save_run_metadata(
-        prediction_dir / f"{variant}_run",
+        metadata_dir,
         config,
         f"inference-{variant}",
         {
             "variant": variant,
+            "base_model": str(variant_model_config["base_model"]),
             "adapter_path": str(adapter_path) if adapter_path else None,
             "examples": len(predictions),
+            "target_ids_sha256": _ids_hash(target_ids),
         },
     )
     del model
@@ -147,3 +192,10 @@ def run_inference(
     except ImportError:
         pass
     return output_path
+
+
+def _ids_hash(ids: list[str]) -> str:
+    import hashlib
+
+    payload = "\n".join(ids)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()

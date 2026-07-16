@@ -107,3 +107,43 @@ def test_llm_judge_resumes_completed_blind_decisions(tmp_path, monkeypatch) -> N
 
     assert len(third) == 2
     assert len(calls) == 3
+
+
+def test_llm_judge_skips_pairs_missing_from_requested_variants(monkeypatch) -> None:
+    calls = []
+
+    def fake_judge(client, judge_model, review_text, response_a, response_b):
+        calls.append((review_text, response_a, response_b))
+        return JudgeDecision(choice=JudgeChoice.A, reason="A is better supported.")
+
+    class FakeOpenAI:
+        pass
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test")
+    monkeypatch.setattr(evaluation, "_judge_pair", fake_judge)
+    monkeypatch.setattr("openai.OpenAI", FakeOpenAI)
+
+    config = {
+        "project": {"seed": 42},
+        "evaluation": {
+            "judge_model": "judge-test",
+            "judge_samples_per_pair": 1,
+            "judge_pairs": [["base", "sft"], ["sft", "deepseek_v4_pro_fewshot"]],
+        },
+    }
+    predictions = {
+        variant: [
+            {
+                "id": "id-1",
+                "text": "review",
+                "raw_output": f"{variant} response",
+            }
+        ]
+        for variant in ("base", "sft")
+    }
+
+    decisions = run_llm_judge(config, predictions)
+
+    assert len(decisions) == 1
+    assert decisions[0]["comparison"] == "base_vs_sft"
+    assert len(calls) == 1

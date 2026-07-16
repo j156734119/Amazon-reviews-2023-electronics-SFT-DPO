@@ -141,6 +141,14 @@ def run_llm_judge(
     }
     decisions = []
     for left, right in config["evaluation"]["judge_pairs"]:
+        if left not in by_variant or right not in by_variant:
+            LOGGER.warning(
+                "Skipping judge pair %s_vs_%s because one or both variants were "
+                "not evaluated in this run.",
+                left,
+                right,
+            )
+            continue
         common_ids = sorted(set(by_variant[left]) & set(by_variant[right]))
         rng.shuffle(common_ids)
         pair_limit = int(config["evaluation"].get("judge_samples_per_pair", len(common_ids)))

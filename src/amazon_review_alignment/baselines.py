@@ -9,8 +9,6 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
-import httpx
-
 from .config import output_root
 from .modeling import load_base_model, load_tokenizer, render_chat
 from .prompts import SYSTEM_PROMPT, analysis_user_prompt
@@ -21,7 +19,6 @@ LOGGER = logging.getLogger(__name__)
 
 BASELINE_VARIANTS = (
     "qwen35_2b_fewshot",
-    "phi4_mini_fewshot",
     "nlptown_template",
     "deepseek_v4_pro_fewshot",
 )
@@ -30,12 +27,6 @@ DEFAULT_BASELINES: dict[str, dict[str, Any]] = {
     "qwen35_2b_fewshot": {
         "type": "hf_causal_lm",
         "model_id": "Qwen/Qwen3.5-2B",
-        "prompt_mode": "few_shot",
-        "load_in_4bit": True,
-    },
-    "phi4_mini_fewshot": {
-        "type": "hf_causal_lm",
-        "model_id": "microsoft/Phi-4-mini-instruct",
         "prompt_mode": "few_shot",
         "load_in_4bit": True,
     },
@@ -320,7 +311,9 @@ def deepseek_fewshot_response(
     retries = int(settings.get("max_retries", 3))
     retry_seconds = float(settings.get("retry_seconds", 1.0))
     last_error: Exception | None = None
-    with httpx.Client(timeout=90) as client:
+    import httpx
+
+    with _httpx_client(timeout=90) as client:
         for attempt in range(1, max(retries, 1) + 1):
             try:
                 response = client.post(
@@ -342,6 +335,12 @@ def deepseek_fewshot_response(
                 if attempt < retries:
                     time.sleep(retry_seconds)
     raise RuntimeError(f"DeepSeek baseline failed after {retries} attempts: {last_error}")
+
+
+def _httpx_client(timeout: int) -> Any:
+    import httpx
+
+    return httpx.Client(timeout=timeout)
 
 
 def _append_jsonl(path: Path, row: dict[str, Any]) -> None:
@@ -368,6 +367,7 @@ def run_baseline_inference(
     output_path = prediction_dir / f"{variant}.jsonl"
     test_rows = _target_rows(config)
     target_ids = [str(row["id"]) for row in test_rows]
+    settings = baseline_config(config, variant)
 
     existing_rows = [] if force or not output_path.exists() else read_jsonl(output_path)
     existing_by_id = {str(row.get("id")): row for row in existing_rows}
@@ -377,7 +377,6 @@ def run_baseline_inference(
     if force:
         output_path.write_text("", encoding="utf-8")
 
-    settings = baseline_config(config, variant)
     generation_config = _generation_parameters(config, settings)
     predictions = [
         existing_by_id[review_id]

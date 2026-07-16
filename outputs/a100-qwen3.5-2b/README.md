@@ -11,7 +11,7 @@ adapter weights remain local and ignored by Git.
 Run the analysis again with:
 
 ```powershell
-python tools/analyze_results.py --root outputs/a100-qwen3.5-2b
+python legacy/tools/analyze_results.py --root outputs/a100-qwen3.5-2b
 ```
 
 The `evaluation/` directory also includes the complete AI blind-judge decision
