@@ -69,6 +69,10 @@ The model must return only this JSON shape:
    - `nlptown_template`: product-review sentiment classifier plus grounded template.
    - `deepseek_v4_pro_fewshot`: optional DeepSeek API few-shot baseline.
 
+For the rationale behind these metrics, how to interpret a fine-tuned 2B model
+against larger prompt-only models, and how to scale the method to Qwen 10B+,
+see [Evaluation Metrics And Scaling Strategy](docs/evaluation_and_scaling.md).
+
 ## Maintained Files
 
 - `Amazon_Review_Alignment_A100.ipynb`: end-to-end Colab workflow.

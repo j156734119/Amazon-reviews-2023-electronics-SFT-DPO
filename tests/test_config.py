@@ -62,7 +62,7 @@ def test_expanded_online_profile_uses_shared_1024_prompt_budget() -> None:
     assert config["rlhf"]["grpo"]["prompt_count"] == 1024
     assert config["rlhf"]["ppo"]["output_dir"].endswith("models/ppo-v2")
     assert config["rlhf"]["grpo"]["output_dir"].endswith("models/grpo-v2")
-    assert len(config["evaluation"]["judge_pairs"]) == 15
+    assert len(config["evaluation"]["judge_pairs"]) == 20
     assert "qwen35_2b_fewshot" in config["evaluation"]["variants"]
     assert "deepseek_v4_pro_fewshot" in config["evaluation"]["variants"]
 

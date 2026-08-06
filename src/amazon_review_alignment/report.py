@@ -149,7 +149,7 @@ def build_report(config: dict[str, Any]) -> Path:
             lines.append(
                 f"| {row['comparison']} | {int(row['examples'])} | "
                 f"{_format_rate(row['right_model_win_rate_ties_half'])} | "
-                f"{_format_rate(row['ci_95_low'])}–{_format_rate(row['ci_95_high'])} | "
+                f"{_format_rate(row['ci_95_low'])} - {_format_rate(row['ci_95_high'])} | "
                 f"{int(row['ties'])} |"
             )
     if human is not None:
@@ -162,7 +162,7 @@ def build_report(config: dict[str, Any]) -> Path:
                 f"- Comparison: {human['left_model']} vs {human['right_model']}",
                 f"- {human['right_model']} win rate with ties counted as half: "
                 f"{_format_rate(human['right_model_win_rate_ties_half'])}",
-                f"- Bootstrap 95% CI: {_format_rate(human['ci_95_low'])}–"
+                f"- Bootstrap 95% CI: {_format_rate(human['ci_95_low'])} - "
                 f"{_format_rate(human['ci_95_high'])}",
                 f"- Raw outcomes: {human['left_wins']} / {human['right_wins']} / "
                 f"{human['ties']} (left / right / tie)",
@@ -225,41 +225,48 @@ def build_report(config: dict[str, Any]) -> Path:
         for name, value in grpo.get("final_logged_metrics", {}).items():
             lines.append(f"- `{name}`: {float(value):.6f}")
 
-    lines.extend(
+    constraint_lines = [
+        "",
+        "## Interpretation constraints",
+        "",
+        "- Star ratings are hidden from the teacher and student and are not the main target.",
+        "- Teacher-generated preferences can encode teacher bias despite validation.",
+        (
+            "- Exact substring matching measures evidence traceability, "
+            "not full causal faithfulness."
+        ),
+        (
+            "- A null or negative DPO result is a valid outcome and must "
+            "not be reframed as success."
+        ),
+        (
+            "- PPO and GRPO use AI-generated preferences, so they are reported "
+            "as RLAIF rather than RLHF."
+            if human_calibration_samples == 0
+            else "- PPO and GRPO use AI-generated preferences with a small "
+            "human calibration subset, so they are reported as "
+            "human-calibrated RLAIF rather than pure RLHF."
+        ),
+    ]
+    if ppo is not None:
+        constraint_lines.append(
+            f"- PPO uses {int(ppo['episodes'])} episodes in this A100 run; "
+            "it is a resource-constrained RLAIF baseline, not a convergence claim."
+        )
+    if grpo is not None:
+        constraint_lines.append(
+            f"- GRPO uses {int(grpo['prompts'])} prompts with "
+            f"{int(grpo['generations_per_prompt'])} sampled completions each; "
+            "it is a resource-constrained RLAIF baseline, not a convergence claim."
+        )
+    constraint_lines.extend(
         [
-            "",
-            "## Interpretation constraints",
-            "",
-            "- Star ratings are hidden from the teacher and student and are not the main target.",
-            "- Teacher-generated preferences can encode teacher bias despite validation.",
-            (
-                "- Exact substring matching measures evidence traceability, "
-                "not full causal faithfulness."
-            ),
-            (
-                "- A null or negative DPO result is a valid outcome and must "
-                "not be reframed as success."
-            ),
-            (
-                "- PPO and GRPO use AI-generated preferences, so they are reported "
-                "as RLAIF rather than RLHF."
-                if human_calibration_samples == 0
-                else "- PPO and GRPO use AI-generated preferences with a small "
-                "human calibration subset, so they are reported as "
-                "human-calibrated RLAIF rather than pure RLHF."
-            ),
-            (
-                "- The PPO policy receives only 256 episodes in the T4 configuration; "
-                "it is a resource-constrained baseline, not a convergence claim."
-            ),
-            (
-                "- GRPO uses 256 prompts with four sampled completions each; "
-                "it is a resource-constrained RLAIF baseline, not a convergence claim."
-            ),
-            "- Full conclusions require the configured cloud training runs and blinded evaluation.",
+            "- Pairwise LLM judging measures relative preference under one rubric; "
+            "it should not be treated as a standalone proof of absolute semantic correctness.",
             "",
         ]
     )
+    lines.extend(constraint_lines)
     report_path = evaluation_dir / "report.md"
     report_path.write_text("\n".join(lines), encoding="utf-8")
     save_run_metadata(evaluation_dir / "report_run", config, "build-report")
